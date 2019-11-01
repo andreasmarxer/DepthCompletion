@@ -7,25 +7,23 @@ try
 
     %% definitions
     
-    % initial publisher for testing
-%     pub = rospublisher('/medium_resolution/depth_registered/image', 'sensor_msgs/Image');
-%     pause(1);
-    
     % publisher global
-    pub_global = rospublisher('/depth_adapted/image', 'sensor_msgs/Image');
-    setGlobalPub(pub_global);
+    pub_global_adjDepth = rospublisher('/depth_adapted/image', 'sensor_msgs/Image');
+    setGlobalPub(pub_global_adjDepth);
+    pause(1);
+    
+    pub_global_predictions = rospublisher('/binary_predictions/image', 'sensor_msgs/Image');
+    setGlobalPubBoudingBoxes(pub_global_predictions);
     pause(1);
 
     % subscriber
     sub_depth = rossubscriber('/medium_resolution/depth_registered/image', 'sensor_msgs/Image', @sensor_msgsImageCallback);
     pause(1);
 
-    %% set time correspondance vector for comparing in sensor_msgsImageCallback
+    % load global variable time correspondance vector
     setGlobalTimeCorresp;
-
-    %% testing
-%     msg_test = rosmessage('sensor_msgs/Image');
-%     send(pub, msg_test);
+    % load global struct with bouding box predictions
+    setGlobalBoundingBoxes;
     
 catch exception
     rosshutdown;
@@ -45,60 +43,95 @@ function sensor_msgsImageCallback(~, msg_in)
     
     % get time vector of all correspondant images
     time_corresp = getGlobalTimeCorresp;
+    % get struct with bouding boxes
+    struct_bb_pred = getGlobalBoundingBoxes;
     
+    cell_bb_pred = struct2cell(struct_bb_pred);
+    cell_time_stamp = cell_bb_pred(1,1,:);
+    array_time_stamp = cell2mat(cell_time_stamp(:));
+        
     % if the current message is one of the correspondant images
     % only the correspondant images have predictions and are adjusted !!!
-    if nnz(time_s == time_corresp) == 1
-        disp('=== Correspondant found !!!');
+    if nnz(time_s == array_time_stamp) == 1
+        label = find(time_s == array_time_stamp);
+      
+        asl_train_labels = [1,16,39,90,128,178,199,221,264,269,283,289,307,337,350,355,361,363,365,368];
+
+        if ismember(label, asl_train_labels)
+            disp('-- Training image, return! ');
+            return;
+        else
         
-        % get global publisher
-        pub_global = getGlobalPub;
-        % define message type
-        msg_out = rosmessage('sensor_msgs/Image');
+            disp(strcat('++ Correspondant found ! - Label: ', num2str(label)));
+
+            % get global publisher
+            pub_global_adjDepth = getGlobalPub;
+            % define message type
+            msg_out = rosmessage('sensor_msgs/Image');
+
+            %% copy properties
+            % copy header with time stamp
+            msg_out.Header = msg_in.Header;
+            % copy width and height
+            msg_out.Height = msg_in.Height;
+            msg_out.Width = msg_in.Width;
+            % copy encoding type 32FC1 (single floating point)
+            msg_out.Encoding = msg_in.Encoding;
+            % copy other staff
+            msg_out.Step = msg_in.Step;
+            msg_out.IsBigendian = msg_in.IsBigendian;     
         
+            %% get adjusted depth image and process for writting to message
+            rotation_back = true;
+
+            path = '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/';
+            filename = strcat(path, 'asl_window_', num2str(label), '_depth_adj.png');
+
+            img = imread(filename); % PNG image: uint16, [mm]
+            img = single(img); % backtransform to single
+            img(img < 0.0001) = NaN; % backtransform zeros to NaN
+            img = img/1000; % backtransform to [m]
+
+            if rotation_back == true
+                img = imrotate(img, 180);
+            end
+
+            %% write depth image to data
+            writeImage(msg_out, img);
+
+            %% publish message
+            send(pub_global_adjDepth, msg_out);
+
+            %% binary mask
+            % get global publisher
+            pub_global_predictions = getGlobalPubBoudingBoxes;
+        
+            %disp(num2str(struct_bb_pred(label).x1));
+            num_pred = size(struct_bb_pred(label).x1,1);
+            
+            for window = 1:num_pred
+                % initialize
+                img_bin = single(zeros(size(img)));
+                
+                x1 = struct_bb_pred(label).x1(window);
+                x2 = struct_bb_pred(label).x2(window);
+                y1 = struct_bb_pred(label).y1(window);
+                y3 = struct_bb_pred(label).y3(window);
+                
+                % set mask on where the image was predicted
+                img_bin(y1:y3, x1:x2) = 1;
+
+                % write binary prediction image to data
+                writeImage(msg_out, img_bin);
     
-        %% copy properties
-        % copy header with time stamp
-        msg_out.Header = msg_in.Header;
-%         msg_out.Header.Seq = msg_in.Header.Seq;
-%         msg_out.Header.Stamp.Sec = msg_in.Header.Stamp.Sec;
-%         msg_out.Header.Stamp.Nsec = msg_in.Header.Stamp.Nsec;
-%         msg_out.Header.FrameId = msg_in.Header.FrameId;
-        % copy width and height
-        msg_out.Height = msg_in.Height;
-        msg_out.Width = msg_in.Width;
-        % copy encoding type 32FC1 (single floating point)
-        msg_out.Encoding = msg_in.Encoding;
-        % copy other staff
-        msg_out.Step = msg_in.Step;
-        msg_out.IsBigendian = msg_in.IsBigendian;     
-        
-        %% get adjusted depth image and process for writting to message
-        label = 2;
-        rotation_back = true;
-        
-        path = '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/';
-        filename = strcat(path, 'asl_window_', num2str(label), '_depth_adj.png');
-
-        %%
-        img = imread(filename); % PNG image: uint16, [mm]
-
-        img = single(img); % backtransform to single
-        img(img < 0.0001) = NaN; % backtransform zeros to NaN
-        img = img/1000; % backtransform to [m]
-
-        if rotation_back == true
-            img = imrotate(img, 180);
-        end
-
-        %% write depth image to data
-        writeImage(msg_out, img);
-
-        
-        %% publish message
-        send(pub_global, msg_out);
+                % publish message
+                send(pub_global_predictions, msg_out);
     
-    end
+            end
+        
+        end % else
+
+    end % if nzz
 
 end
 
@@ -109,24 +142,49 @@ function setGlobalPub(pub)
     x = pub;
 end
 
-
 function r = getGlobalPub
     global x
     r = x;
 end
 
+
+
+function setGlobalPubBoudingBoxes(pub)
+    global y
+    y = pub;
+end
+
+function r = getGlobalPubBoudingBoxes
+    global y
+    r = y;
+end
+
 %% global timevector of correspondant times
 
 function setGlobalTimeCorresp
-    global y
+    global z
     % ONLY change this 1 line here !!! -----------------------------------
-    time_struct = load('/home/andreas/Documents/MATLAB/time_corresp_2to9.mat');
+    time_struct = load('/home/andreas/Documents/MATLAB/time_corresp.mat');
     % ONLY change this 1 line here !!! -----------------------------------
-    y = time_struct.time_corresp;
+    z = time_struct.time_corresp;
 end
 
 function time_vec = getGlobalTimeCorresp
-    global y
-    time_vec = y;
+    global z
+    time_vec = z;
 end
 
+
+%% global vector with bouding box coordinates
+function setGlobalBoundingBoxes
+    global w
+    % ONLY change this 1 line here !!! -----------------------------------
+    bb_struct = load('/home/andreas/Documents/MATLAB/struct_bb_pred.mat');
+    % ONLY change this 1 line here !!! -----------------------------------
+    w = bb_struct.struct_bb_pred;
+end
+
+function bb = getGlobalBoundingBoxes
+    global w
+    bb = w;
+end
