@@ -1,6 +1,5 @@
-% Plot the message_time_vec generated in bb_script
-% CARE: This are unordered and do not correspond due to different
-%       exposures!
+% Script to plot message header timestamps
+% CARE: This are unordered and do not correspond due to different exposures!
 
 
 figure(1)
