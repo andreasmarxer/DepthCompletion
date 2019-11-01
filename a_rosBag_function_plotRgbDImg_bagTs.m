@@ -1,6 +1,8 @@
+% Script to extract bag timestamps and plot images
+
 clear; close all; clc;
 
-filename = '2019-10-15-17-48-49.bag';
+filename = '/home/andreas/Documents/ros_recording/2019-10-15-17-48-49.bag';
 bag = rosbag(filename);
 bagInfo = rosbag('info',filename)
 
@@ -104,8 +106,6 @@ function [img, time] = save_plot_img(bag, topic, frame, rotation)
     topic_messages = table2cell(topic_messages_table);
     % take out timestep of the frame where image is read
     time = cell2mat(topic_messages(frame,1));
-    
-
     
     return
 
