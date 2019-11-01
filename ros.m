@@ -1,3 +1,6 @@
+clear; clc;
+rosshutdown;
+
 try
    %% initialization
     rosinit;
@@ -5,8 +8,8 @@ try
     %% definitions
     
     % initial publisher for testing
-    %pub = rospublisher('/medium_resolution/depth_registered/image', 'sensor_msgs/Image');
-    %pause(1);
+%     pub = rospublisher('/medium_resolution/depth_registered/image', 'sensor_msgs/Image');
+%     pause(1);
     
     % publisher global
     pub_global = rospublisher('/depth_adapted/image', 'sensor_msgs/Image');
@@ -21,11 +24,8 @@ try
     setGlobalTimeCorresp;
 
     %% testing
-    %msg_test = rosmessage('sensor_msgs/Image');
-    %send(pub, msg_test);
-    
-    %% shutdown
-    %rosshutdown;
+%     msg_test = rosmessage('sensor_msgs/Image');
+%     send(pub, msg_test);
     
 catch exception
     rosshutdown;
@@ -55,14 +55,15 @@ function sensor_msgsImageCallback(~, msg_in)
         pub_global = getGlobalPub;
         % define message type
         msg_out = rosmessage('sensor_msgs/Image');
+        
     
         %% copy properties
         % copy header with time stamp
-        %msg_out.Header = msg_in.Header;
-        msg_out.Header.Seq = msg_in.Header.Seq;
-        msg_out.Header.Stamp.Sec = msg_in.Header.Stamp.Sec;
-        msg_out.Header.Stamp.Nsec = msg_in.Header.Stamp.Nsec;
-        msg_out.Header.FrameId = msg_in.Header.FrameId;
+        msg_out.Header = msg_in.Header;
+%         msg_out.Header.Seq = msg_in.Header.Seq;
+%         msg_out.Header.Stamp.Sec = msg_in.Header.Stamp.Sec;
+%         msg_out.Header.Stamp.Nsec = msg_in.Header.Stamp.Nsec;
+%         msg_out.Header.FrameId = msg_in.Header.FrameId;
         % copy width and height
         msg_out.Height = msg_in.Height;
         msg_out.Width = msg_in.Width;
@@ -81,14 +82,14 @@ function sensor_msgsImageCallback(~, msg_in)
 
         %%
         img = imread(filename); % PNG image: uint16, [mm]
+
+        img = single(img); % backtransform to single
+        img(img < 0.0001) = NaN; % backtransform zeros to NaN
         img = img/1000; % backtransform to [m]
-        img(img == 0)=NaN; % backtransform zeros to NaN
 
         if rotation_back == true
             img = imrotate(img, 180);
         end
-
-        img = single(img); % backtransform to single
 
         %% write depth image to data
         writeImage(msg_out, img);
