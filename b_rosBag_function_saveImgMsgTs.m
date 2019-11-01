@@ -1,12 +1,11 @@
-% 1. Save numbered images to folder where this script is located.
-% 2. Generate msg_time_vec which contains all message timestamps in order as
-%    received the messages
+% Script to extract message header timestamps and plot and save images
+% Images are not ordered according to correspondant message timestamps !
 
 clear; close all; clc;
 
 filename = '/home/andreas/Documents/ros_recording/2019-10-15-17-48-49.bag';
 bag = rosbag(filename);
-bagInfo = rosbag('info',filename)
+bagInfo = rosbag('info',filename);
 
 
 %%
@@ -39,7 +38,6 @@ for frame = 1:1:length
     msg_time_vec(frame) = msg_time;
     clear msg_time;
 end
-
 
 
 %%
