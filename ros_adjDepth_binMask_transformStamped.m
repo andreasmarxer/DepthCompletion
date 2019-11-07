@@ -1,6 +1,9 @@
 clear; clc;
 rosshutdown;
 
+% set print statements on/off with debug mode
+debug = true;
+
 try
    %% initialization
     rosinit;
@@ -10,6 +13,10 @@ try
     % publisher global
     pub_global_adjDepth = rospublisher('/depth_adapted/image', 'sensor_msgs/Image');
     setGlobalPub(pub_global_adjDepth);
+    pause(1);
+    
+    pub_global_adjDepth_info = rospublisher('/depth_adapted/camera_info', 'sensor_msgs/CameraInfo');
+    setGlobalPubInfo(pub_global_adjDepth_info);
     pause(1);
     
     pub_global_predictions = rospublisher('/binary_predictions/image', 'sensor_msgs/Image');
@@ -22,6 +29,9 @@ try
     
     % subscriber
     sub_depth = rossubscriber('/medium_resolution/depth_registered/image', 'sensor_msgs/Image', @sensor_msgsImageCallback);
+    pause(1);
+    
+    sub_depth_info = rossubscriber('/medium_resolution/depth_registered/camera_info', 'sensor_msgs/CameraInfo', @sensor_msgsInfoCallback);
     pause(1);
     
     sub_tf = rossubscriber('/tf', 'tf2_msgs/TFMessage', @tf2_msgsPoseCallback);
@@ -40,13 +50,17 @@ end
 %% functions
 
 function sensor_msgsImageCallback(~, msg_in)
-    disp("RECEIVED depth_registered/image message, Doing Callback !"); 
+    if getDebug
+        disp("RECEIVED depth_registered/image message, Doing Callback !");
+    end
     
     % convert header time stamp to seconds
     sec = msg_in.Header.Stamp.Sec;
     nsec = msg_in.Header.Stamp.Nsec;
     time_s = sec + nsec/10^9;
-    disp(strcat('Header time stamp: ', num2str(time_s)));
+    if getDebug
+        disp(strcat('Header time stamp: ', num2str(time_s)));
+    end
     
     % get time vector of all correspondant images
     time_corresp = getGlobalTimeCorresp;
@@ -65,11 +79,15 @@ function sensor_msgsImageCallback(~, msg_in)
         asl_train_labels = [1,16,39,90,128,178,199,221,264,269,283,289,307,337,350,355,361,363,365,368];
 
         if ismember(label, asl_train_labels)
-            disp('-- Training image, return! ');
+            if getDebug
+                disp('-- Training image, return! ');
+            end
             return;
         else
-        
-            disp(strcat('++ Correspondant found ! - Label: ', num2str(label)));
+            
+            if getDebug
+                disp(strcat('++ Correspondant found ! - Label: ', num2str(label)));
+            end
 
             % get global publisher
             pub_global_adjDepth = getGlobalPub;
@@ -143,6 +161,29 @@ function sensor_msgsImageCallback(~, msg_in)
 end
 
 
+function sensor_msgsInfoCallback(~, msg_in)
+    if getDebug
+        disp("RECEIVED depth_registered/camera_info message, Doing Callback !");
+    end
+    
+    % get global publisher
+    pub_global_adjDepth_info = getGlobalPubInfo;
+
+    % define message type
+    msg_out = rosmessage('sensor_msgs/CameraInfo');
+    
+    % copy hole message
+    msg_out = msg_in;
+    
+    % write message to new topic (with same name as adjusted depth)
+    % this is needed for the pointcloud visualization in Rviz
+    
+    % publish message
+    send(pub_global_adjDepth_info, msg_out);
+    
+end
+
+
 function tf2_msgsPoseCallback(~, msg_in)
 disp("RECEIVED tf2_msgs/TFMessage message, Doing Callback !");
 
@@ -186,6 +227,17 @@ function r = getGlobalPub
 end
 
 
+function setGlobalPubInfo(pub)
+    global xx
+    xx = pub;
+end
+
+function r = getGlobalPubInfo
+    global xx
+    r = xx;
+end
+
+
 function setGlobalPubBoundingBoxes(pub)
     global y
     y = pub;
@@ -210,29 +262,42 @@ end
 %% global timevector of correspondant times
 
 function setGlobalTimeCorresp
-    global xx
+    global a
     % ONLY change this 1 line here !!! -----------------------------------
     time_struct = load('/home/andreas/Documents/MATLAB/time_corresp.mat');
     % ONLY change this 1 line here !!! -----------------------------------
-    xx = time_struct.time_corresp;
+    a = time_struct.time_corresp;
 end
 
 function time_vec = getGlobalTimeCorresp
-    global xx
-    time_vec = xx;
+    global a
+    time_vec = a;
 end
 
 
 %% global vector with bouding box coordinates
 function setGlobalBoundingBoxes
-    global yy
+    global b
     % ONLY change this 1 line here !!! -----------------------------------
     bb_struct = load('/home/andreas/Documents/MATLAB/struct_bb_pred.mat');
     % ONLY change this 1 line here !!! -----------------------------------
-    yy = bb_struct.struct_bb_pred;
+    b = bb_struct.struct_bb_pred;
 end
 
 function bb = getGlobalBoundingBoxes
-    global yy
-    bb = yy;
+    global b
+    bb = b;
+end
+
+
+%% global variable debug
+
+function setDebug(bool)
+    global d
+    d = bool;
+end
+
+function r = getDebug
+    global d
+    r = d;
 end
