@@ -116,11 +116,6 @@ for window = 1:size(left_x_vec)
         P = [points_x(random3), points_y(random3), points_z(random3)];
         param = pts2plane(P);
 
-        %% take all other points to calculate distance
-        %P_rest = [points_x(1:end~=random3(1) & 1:end~=random3(2) & 1:end~=random3(3)), ...
-        %    points_y(1:end~=random3(1) & 1:end~=random3(2) & 1:end~=random3(3)),...
-        %    points_z(1:end~=random3(1) & 1:end~=random3(2) & 1:end~=random3(3))];
-        
         %% take all points to calculate distance
         P_all = [points_x, points_y, points_z];
         
