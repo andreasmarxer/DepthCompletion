@@ -16,23 +16,26 @@ raster_correction = true; % correct missing depth pixels with kernel
 % depth adaptation
 depth_method = 1; %1 = only z treshold, 2 = only angle threshold, 3 = combination
 
-depth_procentual_th = 0.30; %procentage of depth measurements available
-inlier_th = 20; %mm distance to plane that is considered as inlier
+depth_procentual_th = 0.30; % [%] of depth measurements available
+inlier_th = 20; %[mm] distance to plane that is considered as inlier
 bb_width = 7; %must be odd number, width of frame around bb
 inside = true; %if true also bb_width/2 inside the bb area
 
+confidence_th = 95; % [%] above which prediction confidence consider window
+
 % intelligent x-y ransac picking criterion
 min_max_th = 3; %ratio which the distance max-min of points must have of total bb 
-area_th = 1/6; %procentage of area from bb that the triangle of chosen points must cover
+area_th = 1/9; %procentage of area from bb that the triangle of chosen points must cover
 % depth picking criterion ransac
-depth_dist_th = 1000;
-
+depth_dist_th = 500; %[mm]
+theta_th = 85; % [deg] spherical coordinates threshold
+phi_th = 10; % [deg] spherical coordinates threshold
 
 asl_train_labels = [1,16,39,90,128,178,199,221,264,269,283,289,307,337,...
                     350,355,361,363,365,368];           
                 
 if label == 0
-    label_array = 1:1:488;
+    label_array = 378:1:488;
 else
     label_array = label;
 end
@@ -40,6 +43,7 @@ end
 for label = label_array
 
     if ismember(label, asl_train_labels)
+        disp('Label was used for training, skipped !');
         continue;
     else
         disp(strcat('-Label : ', num2str(label)));
@@ -52,7 +56,16 @@ for label = label_array
         bb_filename = strcat(path, 'rgb_images_predictions/' ,'asl_window_', num2str(label), '_rgb', '.txt');
         rgb_filename = strcat(path, 'rgb_images/' ,'asl_window_', num2str(label), '_rgb', '.jpg');
         [class, confidence, left_x_vec, top_y_vec, width_vec, height_vec] = importBoundingBoxes(bb_filename);
-
+        
+        %% only consider windows with a confidence higher than the th
+        windows_conf = confidence>confidence_th;
+        left_x_vec = left_x_vec(windows_conf);
+        top_y_vec = top_y_vec(windows_conf);
+        width_vec = width_vec(windows_conf);
+        height_vec = height_vec(windows_conf);
+        
+        disp(strcat(num2str(nnz(windows_conf)), {' from '} , num2str(size(windows_conf,1)), ' windows with enough confidence considered'));
+        
         %% original depth image
         depth_img = imread(depth_filename); % meters
 
@@ -89,7 +102,7 @@ for label = label_array
         end
 
         if ploting == true
-            figure(3)
+            figure(2)
             visualize_depth_png(depth_img)  % millimeters
             title(strcat('Depth Image corrected with nonzero median filter (k=', num2str(kernel), ') - Frame : ', num2str(label)));
             plot_bb(left_x_vec,top_y_vec,width_vec,height_vec,depth_img);
@@ -161,6 +174,7 @@ for label = label_array
                 %% fit plane
                 % initialize not unique!
                 random3 = ones(1,3);
+                clear best_random3;
                 %disp(strcat('RANSAC iteration: ', num2str(ransac_it)));
 
                 % crit = FALSE -> make RANSAC
@@ -206,7 +220,7 @@ for label = label_array
                     
                     
                     if while_it > n_tries_before_skip_ransac_it
-                        disp(strcat('Skipped ransac it #', num2str(ransac_it)));
+                        %disp(strcat('Skipped ransac it #', num2str(ransac_it)));
                         ransac_it_skipped = ransac_it_skipped + 1;
                         break % out of while loop
                     end
@@ -231,27 +245,27 @@ for label = label_array
                 distance = dist2plane(P_all, param);
                 inlier = nnz(distance<inlier_th);
                 std = sqrt(sum(distance.^2)/size(distance,1));
-
-                % convert to spherical cam coordiantes and calculate angles
-                % !! only used for alternative depth_method=2 and combi 3!!
-                [theta, phi] = calculateAngles(random3, P_all);
-        
         
                 if depth_method == 1
                     opt_crit_z_angle_fullfilled = 1; %always 1, don't consider this criterion
                 else
-                    opt_crit_z_angle_fullfilled = (abs(theta)<85) && (  ((0<abs(phi)) && (abs(phi)<10)) || ((170<abs(phi)) && (abs(phi)<180)) );
+                    % convert to spherical cam coordiantes and calculate angles
+                    % !! only used for alternative depth_method=2 and combi 3!!
+                    [theta, phi] = calculateAngles(random3, P_all);
+                    opt_crit_z_angle_fullfilled = (abs(theta)<theta_th) && (  ((0<abs(phi)) && (abs(phi)<phi_th)) || ((180-phi_th<abs(phi)) && (abs(phi)<180)) );
                 end
             
             
                 % save new best parameters of ransac
-                if inlier > best_inlier && opt_crit_z_angle_fullfilled
+                if inlier > best_inlier && opt_crit_z_angle_fullfilled && abs(param(2))<1
                     best_inlier = inlier;
                     best_param = param;
                     best_random3 = random3;
                     best_std = std;
-                    best_theta = theta;
-                    best_phi = phi;
+                    if depth_method ~=1
+                        best_theta = theta;
+                        best_phi = phi;
+                    end
                 end
 
             end
@@ -264,17 +278,27 @@ for label = label_array
 
             disp(strcat('Window: ', num2str(window), ' Best inlier ratio: ', num2str(best_inlier/size(points_z,1)), ' Best std: ', num2str(best_std)));
             disp(strcat('Iterations skipped : ', num2str(ransac_it_skipped)));
-            disp(strcat('Best theta: ', num2str(best_theta), 'Best phi: ', num2str(best_phi)));
+            if depth_method ~=1
+                disp(strcat('Best theta: ', num2str(best_theta), 'Best phi: ', num2str(best_phi)));
+            end
             
             % adjust depth image for each pixel inside actual window
             for x = x1:1:x2
                 for y = y1:1:y4
-                    depth_img_corr(y,x) = mapxy2plane(x, y, best_param);
+                    new_value = mapxy2plane(x, y, best_param);
+                    
+                    % use always if no depth actually available
+                    if depth_img(y,x) == 0 && depth_img_corr(y,x) == 0
+                        depth_img_corr(y,x) = new_value;
+                        depth_img_adj(y,x) = new_value;
                     % only use it if nothing is in front of adjusted depth
-                    if depth_img(y,x) == 0 || ...
-                            (depth_img_corr(y,x)<depth_img(y,x) && ...
-                            depth_img_corr(y,x) ~=0)
-                        depth_img_adj(y,x) = depth_img_corr(y,x);
+                    % and the new depth is not zero
+                    elseif (new_value<depth_img(y,x) && ...
+                            new_value<depth_img_adj(y,x))
+                        depth_img_corr(y,x) = new_value;
+                        depth_img_adj(y,x) = new_value;
+                    else
+                        continue;
                     end
                 end
             end 
@@ -314,7 +338,7 @@ for label = label_array
             if size(plane_pts,1) ~=0
                 hold on
                 plot(plane_pts(:,1),plane_pts(:,2),'mo')
-                pause(0.2) % otherwise sometimes this isn't plotted
+                pause(1) % otherwise sometimes this isn't plotted
             end
             
         end
@@ -332,9 +356,6 @@ end % end of label for loop
 
 
 
-
-
-
 %% functions
 
 
@@ -344,8 +365,9 @@ function param = pts2plane(P)
 % standard plane form is: ax + by + cz + d -> c=-1 in our case !!!
 
 % [x, y, 1] * [a; b; d] = z <-> A*x=B --> x = A\B
+% produces the solution using Gaussian elimination, without explicitly forming the inverse
 param = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
-
+test = 1;
 end
 
 
@@ -484,7 +506,7 @@ function adjDepth2PngImage(depth_img_adj, label)
     
 % make changes here ---------------------------------------------------
     type = 'depth_adj';
-    filepath =  '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/temp';
+    filepath =  '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/temp/';
     % ---------------------------------------------------------------------
     
     img = depth_img_adj;
