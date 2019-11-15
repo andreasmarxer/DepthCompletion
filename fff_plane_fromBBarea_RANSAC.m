@@ -4,21 +4,26 @@ clear; clc; close all;
 tic;
 % 370, 2, 10, 377
 % 100 very good with XX params
-label = 364;  %196
+label =165;  %196
 
 % correcting rastered data
 kernel = 5;
 kernel_half = (kernel-1)/2;
+raster_correction = true; % correct missing depth pixels with kernel
 
 % depth adaptation
 depth_method = 1; %1 = only z treshold, 2 = only angle threshold, 3 = combination
-%
-depth_procentual_th = 0.30; %procentage of depth measurements available
-area_th = 1/6; %procentage of area from bb that the triangle of chosen points must cover
-depth_dist_th = 1000;
+
+depth_procentual_th = 0.30; %procentage of depth measurement available
 inlier_th = 20; %mm distance to plane that is considered as inlier
 bb_width = 7; %must be odd number, width of frame around bb
 inside = true; %if true also bb_width/2 inside the bb area
+
+% intelligent x-y ransac picking criterion
+min_max_th = 3; %ratio which the distance max-min of points must have of total bb 
+area_th = 1/6; %procentage of area from bb that the triangle of chosen points must cover
+% depth picking criterion ransac
+depth_dist_th = 1000;
 
 %%=========================================================================
 
@@ -45,7 +50,6 @@ plot_bb(left_x_vec, top_y_vec, width_vec, height_vec, depth_img);
 pause(0.2)
 
 %% correcting rastered holes
-raster_correction = true;
 
 if raster_correction == true
     depth_img_woraster = depth_img;
@@ -135,8 +139,6 @@ for window = 1:size(left_x_vec)
         must_ransac_crit = 1;
         opt_ransac_crit_xy_minmax = 1;
         opt_ransac_crit_z = 1;
-        opt_ransac_crit_xy = 1;
-        opt_ransac_crit = 1;
         opt_ransac_crit_depth = 1;
         
         while_it = 0;
@@ -145,49 +147,31 @@ for window = 1:size(left_x_vec)
         
         %% while loop -----------------------------------------------------
 
-        %while must_ransac_crit
-        %while must_ransac_crit || opt_ransac_crit_z || opt_ransac_crit_xy_minmax
-        %while opt_ransac_crit_z || opt_ransac_crit_xy_minmax || opt_ransac_crit_area
         while opt_ransac_crit_xy_minmax || opt_ransac_crit_area || opt_ransac_crit_depth
             
+            % pick random points
             random3 = randi([1 size(points_x,1)],1,3);
             %disp(strcat('while loop it: ', num2str(while_it)));
             
             % Update the criterions
             must_ransac_crit = size(unique(random3),2) ~= 3 || size(unique(points_x(random3)),1) < 2 || size(unique(points_y(random3)),1) < 2;
-            opt_ransac_crit_xy_minmax = max(points_x(random3))-min(points_x(random3)) < (x2-x1)/3 || max(points_y(random3))-min(points_y(random3)) < (y4-y1)/3;
+            opt_ransac_crit_xy_minmax = max(points_x(random3))-min(points_x(random3)) < (x2-x1)/min_max_th || max(points_y(random3))-min(points_y(random3)) < (y4-y1)/min_max_th;
+            
+            [A_P_triangle, A_bb] = calculateAreas(random3, points_x, points_y, x1, x2, y2, y3); % calculate area inside selected 3 random points
+            opt_ransac_crit_area = A_P_triangle < area_th*A_bb;
             
             if depth_method == 2
                 opt_ransac_crit_depth = 0; % don't considered
             else
                 opt_ransac_crit_depth = max(points_z(random3))-min(points_z(random3)) > depth_dist_th;
             end
-            
-            % calculate area inside selected 3 random points
-            [A_P_triangle, A_bb] = calculateAreas(random3, points_x, points_y, x1, x2, y2, y3);
-            
-            opt_ransac_crit_area = A_P_triangle < area_th*A_bb;
- 
-%             %% debug
-%             close all;
-%             figure(2)
-%             visualize_depth_png(depth_img)  % millimeters
-%             title(strcat('Depth Image corrected with nonzero median filter (k=', num2str(kernel), ') - Frame : ', num2str(label)));
-%             plot_bb(left_x_vec, top_y_vec, width_vec, height_vec, depth_img);
-%             pause(0.2)
-%             hold on
-%             plot(points_x(random3(1)), points_y(random3(1)),'o')
-%             hold on
-%             plot(points_x(random3(2)), points_y(random3(2)),'o')
-%             hold on
-%             plot(points_x(random3(3)), points_y(random3(3)),'o')
+    
             
             if while_it > n_tries_before_skip_ransac_it
                 disp(strcat('Skipped ransac it #', num2str(ransac_it)));
                 ransac_it_skipped = ransac_it_skipped + 1;
                 break % out of while loop
             end
-            
             while_it = while_it + 1;
         end
         %% end of while ---------------------------------------------------
@@ -219,7 +203,6 @@ for window = 1:size(left_x_vec)
         else
             opt_crit_z_angle_fullfilled = (abs(theta)<85) && (  ((0<abs(phi)) && (abs(phi)<10)) || ((170<abs(phi)) && (abs(phi)<180)) );
         end
-            % as always: 1 is bad, 0 is good
         
         % save new best parameters of ransac
         if inlier > best_inlier && opt_crit_z_angle_fullfilled
