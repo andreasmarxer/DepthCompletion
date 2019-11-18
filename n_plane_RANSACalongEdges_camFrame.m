@@ -4,8 +4,9 @@ clear; clc; close all;
 
 %%%%%%%%%%%%%%%%%%%
 ploting = true;
+debug = false;
 save = false;
-label = 126; 
+label = 198; 
 % edge detector horizontal tunned with 366
 % 126: nned 0.1 threshold for peaks !!
 % working well: 198, 366, 126, 367, 131
@@ -20,20 +21,14 @@ raster_correction = true; % correct missing depth pixels with kernel
 % depth adaptation
 depth_method = 1; %1 = only z treshold, 2 = only angle threshold, 3 = combination
 
-depth_procentual_th = 0.30; % [%] of depth measurements available
+depth_procentual_th = 0.25; % [%] of depth measurements available
 inlier_th = 50; %[mm] distance to plane that is considered as inlier
 bb_width = 7; %must be odd number, width of frame around bb
 inside = true; %if true also bb_width/2 inside the bb area
 
 confidence_th = 95; % [%] above which prediction confidence consider window
 
-% intelligent x-y ransac picking criterion
-% min_max_th = 3; %ratio which the distance max-min of points must have of total bb 
 area_th = 1/9; %procentage of area from bb that the triangle of chosen points must cover
-% depth picking criterion ransac
-% depth_dist_th = 500; %[mm]
-% theta_th = 85; % [deg] spherical coordinates threshold
-% phi_th = 10; % [deg] spherical coordinates threshold
 
 asl_train_labels = [1,16,39,90,128,178,199,221,264,269,283,289,307,337,...
                     350,355,361,363,365,368];           
@@ -70,16 +65,10 @@ for label = label_array
         
         disp(strcat(num2str(nnz(windows_conf)), {' from '} , num2str(size(windows_conf,1)), ' windows with enough confidence considered'));
         
-        %% original depth image
+        %% depth image
         depth_img = imread(depth_filename); % meters
 
-        %% rgb image
-        figure(2)
-        imshow(rgb_filename)
-        pause(0.2)
-
-        %% correcting rastered holes
-
+        % correcting rastered holes
         if raster_correction == true
             depth_img_woraster = depth_img;
 
@@ -101,6 +90,7 @@ for label = label_array
         end
 
         %% adjust the depth
+        % initialization
         depth_img_adj = depth_img;
         depth_img_corr = uint16(zeros(size(depth_img)));
         plane_pts = uint16([]);
@@ -119,12 +109,44 @@ for label = label_array
             else
                 % only go outside the predicted bb for plane fitting
                 bb_width_scale = 0:1:bb_width-1;
+            end          
+            
+            % edge detection
+            [y_top, y_bot, x_left, x_right] = holeEdgeShit(depth_img_woraster, x1, x2, y1, y3, bb_width, debug);
+            
+            
+            % get intersections of edge function
+            x_vec = x1:x2;
+            xs1 = find( x_left( y_top( x_vec ) ) == x_vec )+x1-1;
+            ys1 = y_top(xs1);
+            
+            xs2 = find( x_right( y_top( x_vec ) ) == x_vec )+x1-1;
+            ys2 = y_top(xs2);
+            
+            xs3 = find( x_right( y_bot( x_vec ) ) == x_vec )+x1-1;
+            ys3 = y_bot(xs3);
+            
+            xs4 = find( x_left( y_bot( x_vec ) ) == x_vec )+x1-1;
+            ys4 = y_bot(xs4);
+            
+            % 1. get bounding box edge frame coordinates
+            [points_x, points_y] = getEdgeframeCoordinates(xs1,ys1, xs2,ys2, xs3,ys3, xs4,ys4, y_top, y_bot, x_left, x_right, bb_width, bb_width_scale, depth_img);
+            
+            
+            % plot rgb image with edges etc.
+            %% rgb image
+            if ploting == true
+                figure(2)
+                imshow(rgb_filename)
+                plot_bb(left_x_vec,top_y_vec,width_vec,height_vec,depth_img);
+                pause(0.2)
+                hold on
+                plot(points_x, points_y,'.');
+                hold on
+                plot([xs1;xs2;xs3;xs4],[ys1;ys2;ys3;ys4], 'y+');
+                hold on
             end
-
-            %% 1. get bounding box frame coordinates
-            [points_x, points_y] = getBBframeCoordinates(x1,y1, x2,y2, ...
-                x3,y3, x4,y4, bb_width, bb_width_scale, depth_img);
-
+            
             % initialize depth with NaNs
             points_z = NaN(size(points_x,1),1);
             n_points_z_total = size(points_z,1);
@@ -244,47 +266,6 @@ for label = label_array
             if depth_method ~=1
                 disp(strcat('Best theta: ', num2str(best_theta), 'Best phi: ', num2str(best_phi)));
             end
-            
-            
-            %% edge detection
-            [y_top, y_bot, x_left, x_right] = holeEdgeShit(depth_img_woraster, x1, x2, y1, y3, bb_width);
-            
-            
-            %% SP's
-            x_vec = x1:x2;
-            xs1 = find( x_left( y_top( x_vec ) ) == x_vec )+x1-1;
-            ys1 = y_top(xs1);
-            
-            xs2 = find( x_right( y_top( x_vec ) ) == x_vec )+x1-1;
-            ys2 = y_top(xs2);
-            
-            xs3 = find( x_right( y_bot( x_vec ) ) == x_vec )+x1-1;
-            ys3 = y_bot(xs3);
-            
-            xs4 = find( x_left( y_bot( x_vec ) ) == x_vec )+x1-1;
-            ys4 = y_bot(xs4);
-            
-            [points_x, points_y] = getEdgeframeCoordinates(xs1,ys1, xs2,ys2, xs3,ys3, xs4,ys4, y_top, y_bot, x_left, x_right, bb_width, bb_width_scale, depth_img);
-            
-            figure(2)
-            hold on; plot(points_x(1:end),points_y(1:end),'x');
-            
-            %%
-            figure(2)
-            bb_width_half = (bb_width-1)/2;
-            hold on
-            plot(x1-bb_width_half:x2+bb_width_half, y_top(x1-bb_width_half:x2+bb_width_half))
-            hold on
-            plot(x1-bb_width_half:x2+bb_width_half, y_bot(x1-bb_width_half:x2+bb_width_half))
-            hold on
-            plot(x_left(y1-bb_width_half:y3+bb_width_half), y1-bb_width_half:y3+bb_width_half)
-            hold on
-            plot(x_right(y1-bb_width_half:y3+bb_width_half), y1-bb_width_half:y3+bb_width_half)
-            hold on
-            plot_bb(left_x_vec, top_y_vec, width_vec, height_vec, depth_img);
-            hold on
-            plot([xs1;xs2;xs3;xs4],[ys1;ys2;ys3;ys4], 'g+');
-            hold on
 
             % camera parameters (saved fram CameraInfo topic in RosBag)
             load('/home/andreas/Documents/DepthAdaptation/K.mat');
@@ -321,35 +302,24 @@ for label = label_array
                     end % of if
                 end % of for y
             end % of for x
-
-            % plot points from which plane was fitted in depth image
-            if size(plane_pts,1) ~= 0 && ploting == true
-                % plot them if any plane is fitted
-                figure(2)
-                hold on
-                plot(plane_pts(:,1), plane_pts(:,2),'mo')
-            end
             
         end
         % end of window for loop
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
         %% visualization
-
+        
+        % plot points from which plane was fitted in depth image
+        if size(plane_pts,1) ~= 0 && ploting == true
+            % plot them if any plane is fitted
+            figure(2)
+            hold on
+            plot(plane_pts(:,1), plane_pts(:,2),'mo')
+        end
+            
         if ploting == true
             
-%             figure(3)
-%             visualize_depth_png(depth_img_corr)  % millimeters
-%             title(strcat('RANSAC plane fitted windows - Frame : ', num2str(label)));
-%             plot_bb(left_x_vec, top_y_vec, width_vec, height_vec, depth_img);
-%             pause(0.2) % otherwise sometimes this isn't plotted
-%             if size(plane_pts,1) ~=0
-%                 hold on
-%                 plot(plane_pts(:,1),plane_pts(:,2),'mo')
-%                 pause(0.2) % otherwise sometimes this isn't plotted
-%             end
-
-            figure(4)
+            figure(3)
             pause(0.2)
             visualize_depth_png(depth_img_adj)
             pause(0.2)
@@ -359,7 +329,11 @@ for label = label_array
             if size(plane_pts,1) ~=0
                 hold on
                 plot(plane_pts(:,1),plane_pts(:,2),'mo')
-                pause(1) % otherwise sometimes this isn't plotted
+                pause(0.5) % otherwise sometimes this isn't plotted
+                figure(1)
+                hold on
+                plot(plane_pts(:,1),plane_pts(:,2),'mo')
+                pause(0.5) % otherwise sometimes this isn't plotted
             end
             
         end
@@ -514,28 +488,48 @@ function [points_x, points_y] = getEdgeframeCoordinates(xs1,ys1, xs2,ys2, xs3,ys
     
     % write bouding box frame coordinates start top left clockwise (1->4)
     bb_width_half = (bb_width-1)/2;
-
-    % care, this now are non square boxes anymore !!!
-    points_x_12 = repmat((xs1-bb_width_half:xs2-bb_width_half-1)', bb_width, 1);
-    points_y_23 = repmat((ys2-bb_width_half:ys3-bb_width_half-1)', bb_width, 1);
-    points_x_34 = repmat((xs3+bb_width_half:-1:xs4+bb_width_half+1)', bb_width, 1);
-    points_y_41 = repmat((ys4+bb_width_half:-1:ys1+bb_width_half+1)', bb_width, 1);
-
-    points_y_12 = ones(xs2-xs1,1) * bb_width_scale + repmat((y_top(xs1-bb_width_half:xs2-bb_width_half-1))',1,bb_width);
-    points_y_12 = points_y_12(:);
-    points_x_23 = ones(ys3-ys2,1) * bb_width_scale + repmat((x_right(ys2-bb_width_half:ys3-bb_width_half-1))',1,bb_width);
-    points_x_23 = points_x_23(:);
-    points_y_34 = ones(xs3-xs4,1) * bb_width_scale + repmat((y_bot(xs3+bb_width_half:-1:xs4+bb_width_half+1))',1,bb_width);
-    points_y_34 = points_y_34(:);
-    points_x_41 = ones(ys4-ys1,1) * bb_width_scale + repmat((x_left(ys4+bb_width_half:-1:ys1+bb_width_half+1))',1,bb_width);
-    points_x_41 = points_x_41(:);
     
-    %%
-    figure(2)
-    hold on; plot(points_x_12(1:end),points_y_12(1:end),'x');
-    hold on; plot(points_x_23(1:end),points_y_23(1:end),'x');
-    hold on; plot(points_x_34(1:end),points_y_34(1:end),'x');
-    hold on; plot(points_x_41(1:end),points_y_41(1:end),'x');
+    % care, this now are non square boxes anymore !!!
+    if xs1-bb_width>1 && xs4>1 && ys1-bb_width>1 && ys2-bb_width>1
+        % can make nice corner overlaps
+        points_x_12 = repmat((xs1-bb_width_half:xs2-bb_width_half-1)', bb_width, 1);
+        points_y_23 = repmat((ys2-bb_width_half:ys3-bb_width_half-1)', bb_width, 1);
+        points_x_34 = repmat((xs3+bb_width_half:-1:xs4+bb_width_half+1)', bb_width, 1);
+        points_y_41 = repmat((ys4+bb_width_half:-1:ys1+bb_width_half+1)', bb_width, 1);
+
+        points_y_12 = ones(xs2-xs1,1) * bb_width_scale + repmat((y_top(xs1-bb_width_half:xs2-bb_width_half-1))',1,bb_width);
+        points_y_12 = points_y_12(:);
+        points_x_23 = ones(ys3-ys2,1) * bb_width_scale + repmat((x_right(ys2-bb_width_half:ys3-bb_width_half-1))',1,bb_width);
+        points_x_23 = points_x_23(:);
+        points_y_34 = ones(xs3-xs4,1) * bb_width_scale + repmat((y_bot(xs3+bb_width_half:-1:xs4+bb_width_half+1))',1,bb_width);
+        points_y_34 = points_y_34(:);
+        points_x_41 = ones(ys4-ys1,1) * bb_width_scale + repmat((x_left(ys4+bb_width_half:-1:ys1+bb_width_half+1))',1,bb_width);
+        points_x_41 = points_x_41(:); 
+    else
+        % start at xs1 instead of xs1-bb_width_half
+        % --> corner has empty part
+        points_x_12 = repmat((xs1:xs2-1)', bb_width, 1);
+        points_x_34 = repmat((xs3:-1:xs4+1)', bb_width, 1);
+        points_y_12 = ones(xs2-xs1,1) * bb_width_scale + repmat((y_top(xs1:xs2-1))',1,bb_width);
+        points_y_12 = points_y_12(:);
+        points_y_34 = ones(xs3-xs4,1) * bb_width_scale + repmat((y_bot(xs3:-1:xs4+1))',1,bb_width);
+        points_y_34 = points_y_34(:);
+        % rest is equal
+        points_y_23 = repmat((ys2:ys3-1)', bb_width, 1);
+        points_y_41 = repmat((ys4:-1:ys1+1)', bb_width, 1);
+
+        points_x_23 = ones(ys3-ys2,1) * bb_width_scale + repmat((x_right(ys2:ys3-1))',1,bb_width);
+        points_x_23 = points_x_23(:);
+        points_x_41 = ones(ys4-ys1,1) * bb_width_scale + repmat((x_left(ys4:-1:ys1+1))',1,bb_width);
+        points_x_41 = points_x_41(:);
+    end
+    
+    %% Debugging
+%     figure(2)
+%     hold on; plot(points_x_12(1:end),points_y_12(1:end),'x');
+%     hold on; plot(points_x_23(1:end),points_y_23(1:end),'x');
+%     hold on; plot(points_x_34(1:end),points_y_34(1:end),'x');
+%     hold on; plot(points_x_41(1:end),points_y_41(1:end),'x');
             
     %% summarize output 
     points_x = [points_x_12; points_x_23; points_x_34; points_x_41];
@@ -624,7 +618,7 @@ end
 
 %% hough transform
 
-function [xy_bb_top, xy_bb_bot] = calculate_topBot_lines(lines, y1, y3, x1, x2)
+function [xy_bb_top, xy_bb_bot] = calculate_topBot_lines(lines, y1, y3, x1, x2, debug)
 % initialization
 max_len_top = 0;
 max_len_bot = 0;
@@ -644,28 +638,32 @@ for k = 1:length(lines)
 
         %line_top
         if lines(k).point1(2) < y_bb_1_3_top && lines(k).point2(2) < y_bb_1_3_top
-            disp('top line')
             len = norm(lines(k).point1 - lines(k).point2);
             if (len > 1.1*max_len_top)
                 max_len_top = len;
                 % endpoint of longest top line
                 xy_bb_top = [lines(k).point1; lines(k).point2];
             end
-            figure(10)
-            hold on
-            plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+            % Debugging
+            if debug == true
+                figure(10)
+                hold on
+                plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+            end
         %line_bottom
         elseif lines(k).point1(2) > y_bb_2_3_bot && lines(k).point2(2) > y_bb_2_3_bot
-            disp('bottom line')
             len = norm(lines(k).point1 - lines(k).point2);
             if (len > 1.1*max_len_bot)
                 max_len_bot = len;
                 % endpoint of longest bot line
                 xy_bb_bot = [lines(k).point1; lines(k).point2];
             end
-            figure(10)
-            hold on
-            plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+            % Debuging
+            if debug == true
+                figure(10)
+                hold on
+                plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+            end
         end
     end
 
@@ -674,7 +672,7 @@ end
 end
 
 
-function [xy_bb_left, xy_bb_right] = calculate_leftRight_lines(lines, x1, x2, y1, y3)
+function [xy_bb_left, xy_bb_right] = calculate_leftRight_lines(lines, x1, x2, y1, y3, debug)
 % initialization
 max_len_left = 0;
 max_len_right = 0;
@@ -694,27 +692,29 @@ for k = 1:length(lines)
         %line_left
         if lines(k).point1(1) < x_bb_2_3_left && lines(k).point2(1) < x_bb_2_3_left
             len = norm(lines(k).point1 - lines(k).point2);
-            disp(strcat('left line, total nr. : ', num2str(k), 'length: ', num2str(len)));
             if (len > 1.1*max_len_left) && (len > round(1/3*(y3-y1)))
                 max_len_left = len;
                 % endpoint of longest top line
                 xy_bb_left = [lines(k).point1; lines(k).point2];
             end
-            figure(11)
-            hold on
-            plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+            if debug == true
+                figure(11)
+                hold on
+                plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+            end
         %line_right
         elseif lines(k).point1(1) > x_bb_1_3_right && lines(k).point2(1) > x_bb_1_3_right
-            disp('right line')
             len = norm(lines(k).point1 - lines(k).point2);
             if (len > 1.1*max_len_right) && (len > round(1/3*(y3-y1)))
                 max_len_right = len;
                 % endpoint of longest bot line
                 xy_bb_right = [lines(k).point1; lines(k).point2];
             end
-            figure(11)
-            hold on
-            plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+            if debug == true
+                figure(11)
+                hold on
+                plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+            end
         end
     end
 
@@ -723,7 +723,7 @@ end
 end
 
 
-function [y_top, y_bot, x_left, x_right] = holeEdgeShit(depth_img_woraster, x1, x2, y1, y3, bb_width)
+function [y_top, y_bot, x_left, x_right] = holeEdgeShit(depth_img_woraster, x1, x2, y1, y3, bb_width, debug)
 
 bb_width_half = (bb_width-1)/2;
 
@@ -749,21 +749,34 @@ min_lenght_th = round(1/3*(x2-x1));
 lines = houghlines(BW, Theta, Rho, Peaks, 'FillGap', fill_gap_th, 'MinLength', min_lenght_th);
 %lines2 = houghlines(BW, Theta2, Rho2, Peaks2, 'FillGap', 30, 'MinLength', 50);
 
-figure(10)
-imshow(BW)
-hold on
-figure(11)
-imshow(BW)
-hold on
+if debug == true
+    figure(10)
+    imshow(BW)
+    hold on
+    figure(11)
+    imshow(BW)
+    hold on
+end
 
 % 4. calculte best lines
 % top and bot start and end point in bb coordinates
-[xy_bb_top, xy_bb_bot] = calculate_topBot_lines(lines, y1, y3, x1, x2);
+[xy_bb_top, xy_bb_bot] = calculate_topBot_lines(lines, y1, y3, x1, x2, debug);
 % left and right start and end point in bb coordinates
-[xy_bb_left, xy_bb_right] = calculate_leftRight_lines(lines, x1, x2, y1, y3);
+[xy_bb_left, xy_bb_right] = calculate_leftRight_lines(lines, x1, x2, y1, y3, debug);
 
 % 5. convert line to function of x coordinate
-for x = x1-bb_width_half:x2+bb_width_half
+if x1-bb_width_half > 1
+    x_ = x1-bb_width_half:x2+bb_width_half;
+else
+    x_ = x1:x2;
+end
+if y1-bb_width_half > 1
+    y_ = y1-bb_width_half:y3+bb_width_half;
+else
+    y_ = y1:y3;
+end
+    
+for x = x_
     if xy_bb_top ~= 0
         y_top(x) = bbPoints2YEdgeBorder(x, xy_bb_top, y1, y3, x1);
     else
@@ -776,7 +789,7 @@ for x = x1-bb_width_half:x2+bb_width_half
     end
 end
 
-for y = y1-bb_width_half:y3+bb_width_half
+for y = y_
     if xy_bb_left ~= 0
         x_left(y) = bbPoints2XEdgeBorder(y, xy_bb_left, x1, x2, y1);
     else
@@ -812,13 +825,14 @@ param = [x1, 1; x2, 1]\[y1; y2];
 end
 
 
-function y = bbPoints2YEdgeBorder(x, xy_bb, y1, y3, x1)
+function [y, x] = bbPoints2YEdgeBorder(x, xy_bb, y1, y3, x1)
 param = pts2line(xy_bb); 
 a = param(1);
 b= param(2);
 % We fitted the function in bounding box coordinates y_bb = a*x_bb + b
 % But now are interested in y = f(x) in pixel coordinates
 % Insert for y_bb and x_bb leads to:    y-y1 = a*(x-x1) + b;
+
 
 y = a*x + b -a*x1 + y1;
 
