@@ -5,9 +5,11 @@ clear; clc; close all;
 %%%%%%%%%%%%%%%%%%%
 ploting = true;
 save = false;
-label = 218;  %52 fails 
+label = 130; 
 % edge detector horizontal tunned with 366
-% 126 good for tuning vertical also
+% 126: nned 0.1 threshold for peaks !!
+% working well: 198, 366, 126, 367
+% FAILS: 52, 298, 301, 302
 %%%%%%%%%%%%%%%%%%%
 
 % correcting rastered data
@@ -80,7 +82,9 @@ for label = label_array
 %         end
 
         %% rgb image
-        
+        figure(2)
+        imshow(rgb_filename)
+        pause(0.2)
 %         if ploting == true
 %         figure(2)
 %         imshow(rgb_filename)
@@ -265,22 +269,33 @@ for label = label_array
             
             % 1. make hough transform: rho = x*cos(theta) + y*sin(theta)
             [Hough, Theta, Rho] = hough(BW, 'RhoResolution', 1, 'Theta', -90:89);
+            %[Hough2, Theta2, Rho2] = hough(BW, 'RhoResolution', 1, 'Theta', 45:89);
             
             % 2. visualize peaks of hough transform
-            num_peaks = 10;
-            Peaks  = houghpeaks(Hough, num_peaks, 'threshold', ceil(0.1*max(Hough(:)))); % peak
+            num_peaks = 50;
+            Peaks  = houghpeaks(Hough, num_peaks, 'threshold', ceil(0.2*max(Hough(:)))); % peak
+            %Peaks2  = houghpeaks(Hough2, num_peaks, 'threshold', ceil(0.5*max(Hough2(:)))); % peak
             
             % 3. visualize the fitted lines
-            lines = houghlines(BW, Theta, Rho, Peaks, 'FillGap', 30, 'MinLength', 30);
-            figure(3)
+            a = 0.0741;
+            b = 7.7778;
+            fill_gap_th = round(a*(x2-x1)+b);
+            min_lenght_th = round(1/3*(x2-x1));
+            lines = houghlines(BW, Theta, Rho, Peaks, 'FillGap', fill_gap_th, 'MinLength', min_lenght_th);
+            %lines2 = houghlines(BW, Theta2, Rho2, Peaks2, 'FillGap', 30, 'MinLength', 50);
+            
+            figure(10)
+            imshow(BW)
+            hold on
+            figure(11)
             imshow(BW)
             hold on
 
             % 4. calculte best lines
             % top and bot start and end point in bb coordinates
-            [xy_bb_top, xy_bb_bot] = calculate_topBot_lines(lines, y1, y3);
+            [xy_bb_top, xy_bb_bot] = calculate_topBot_lines(lines, y1, y3, x1, x2);
             % left and right start and end point in bb coordinates
-            [xy_bb_left, xy_bb_right] = calculate_leftRight_lines(lines, x1, x2);
+            [xy_bb_left, xy_bb_right] = calculate_leftRight_lines(lines, x1, x2, y1, y3);
             
             % 5. convert line to function of x coordinate
             for x = x1:x2
@@ -302,7 +317,7 @@ for label = label_array
                 else
                     x_left(y) = x1;
                 end
-                if xy_bb_bot ~= 0
+                if xy_bb_right ~= 0
                     x_right(y) = bbPoints2XEdgeBorder(y, xy_bb_right, x1, x2, y1);
                 else
                     x_right(y) = x2;
@@ -316,8 +331,6 @@ for label = label_array
             x_right= round(x_right);
             
             figure(2)
-            imshow(rgb_filename)
-            pause(0.2)
             hold on
             plot(x1:x2, y_top(x1:x2))
             hold on
@@ -328,6 +341,10 @@ for label = label_array
             plot(x_right(y1:y3), y1:y3)
             hold on
             plot_bb(left_x_vec, top_y_vec, width_vec, height_vec, depth_img);
+            hold on
+
+            % camera parameters (saved fram CameraInfo topic in RosBag)
+            load('/home/andreas/Documents/DepthAdaptation/K.mat');
 
             % adjust depth image for each pixel inside actual window
             for x = x1:1:x2
@@ -335,7 +352,7 @@ for label = label_array
                     if y_top(x)<=y && y_bot(x)>=y && x_left(y)<=x && x_right(y)>=x
                         
                         % convert x,y [px] to normalized image coordinates x,y [m] (z=1)
-                        [X_norm, Y_norm] = pixel2normImgCoordinates(x, y);
+                        [X_norm, Y_norm] = pixel2normImgCoordinates(x, y, K);
 
                         % calculate new Z value
                         % n*[x_n; y_n; 1] = [X_c; Y_c; Z_c] 
@@ -390,7 +407,9 @@ for label = label_array
 %             end
 
             figure(4)
+            pause(0.2)
             visualize_depth_png(depth_img_adj)
+            pause(0.2)
             title(strcat('Corrected depth image (k=', num2str(kernel), ') with RANSAC plane fitted windows - Frame : ', num2str(label)));
             plot_bb(left_x_vec, top_y_vec, width_vec, height_vec, depth_img);
             pause(0.5) % otherwise sometimes this isn't plotted
@@ -428,7 +447,7 @@ param = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
 end
 
 
-function [points_X_norm, points_Y_norm] = pixel2normImgCoordinates(x, y)
+function [points_X_norm, points_Y_norm] = pixel2normImgCoordinates(x, y, K)
 % Input     u,v are pixel coordinates (origin top left), z is depth in mm
 % Output:   x,y,1 in normalized image coordinates at z=1 [mm]
 
@@ -436,8 +455,6 @@ function [points_X_norm, points_Y_norm] = pixel2normImgCoordinates(x, y)
 points_X_norm = zeros(size(x,1),1);
 points_Y_norm = zeros(size(x,1),1);
 
-% camera parameters (saved fram CameraInfo topic in RosBag)
-load('K.mat');
 K_inv = inv(K);
 
     for i=1:size(x,1)
@@ -609,7 +626,7 @@ end
 
 %% hough transform
 
-function [xy_bb_top, xy_bb_bot] = calculate_topBot_lines(lines, y1, y3)
+function [xy_bb_top, xy_bb_bot] = calculate_topBot_lines(lines, y1, y3, x1, x2)
 % initialization
 max_len_top = 0;
 max_len_bot = 0;
@@ -618,7 +635,8 @@ xy_bb_top = 0;
 xy_bb_bot = 0;
 
 
-y_bb_half = floor((y3-y1)/2); % no + y1 due to the fact that this is in BB coords
+y_bb_1_3_top = floor((y3-y1)/3); % no + y1 due to the fact that this is in BB coords
+y_bb_2_3_bot = floor(2*(y3-y1)/3);
 
 for k = 1:length(lines)
 
@@ -627,27 +645,27 @@ for k = 1:length(lines)
     if line_of_interest(k) == true
 
         %line_top
-        if lines(k).point1(2) < y_bb_half && lines(k).point2(2) < y_bb_half
+        if lines(k).point1(2) < y_bb_1_3_top && lines(k).point2(2) < y_bb_1_3_top
             disp('top line')
             len = norm(lines(k).point1 - lines(k).point2);
-            if (len > max_len_top)
-            max_len_top = len;
+            if (len > 1.1*max_len_top)
+                max_len_top = len;
                 % endpoint of longest top line
                 xy_bb_top = [lines(k).point1; lines(k).point2];
             end
-            figure(3)
+            figure(10)
             hold on
             plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
         %line_bottom
-        elseif lines(k).point1(2) > y_bb_half && lines(k).point2(2) > y_bb_half
+        elseif lines(k).point1(2) > y_bb_2_3_bot && lines(k).point2(2) > y_bb_2_3_bot
             disp('bottom line')
             len = norm(lines(k).point1 - lines(k).point2);
-            if (len > max_len_bot)
+            if (len > 1.1*max_len_bot)
                 max_len_bot = len;
                 % endpoint of longest bot line
                 xy_bb_bot = [lines(k).point1; lines(k).point2];
             end
-            figure(3)
+            figure(10)
             hold on
             plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
         end
@@ -658,7 +676,7 @@ end
 end
 
 
-function [xy_bb_left, xy_bb_right] = calculate_leftRight_lines(lines, x1, x2)
+function [xy_bb_left, xy_bb_right] = calculate_leftRight_lines(lines, x1, x2, y1, y3)
 % initialization
 max_len_left = 0;
 max_len_right = 0;
@@ -666,36 +684,37 @@ line_of_interest = nan(length(lines),1);
 xy_bb_left = 0;
 xy_bb_right = 0;
 
-x_bb_half = floor((x2-x1)/2);
+x_bb_2_3_left = floor(2*(x2-x1)/3);
+x_bb_1_3_right = floor((x2-x1)/3);
 
 for k = 1:length(lines)
 
-    % only lines that have an theta angle < 45° = "vertical lines"
-    line_of_interest(k) = 0 < abs(lines(k).theta) && abs(lines(k).theta) < 45;
+    % only lines that have an theta angle < 25° = "vertical lines"
+    line_of_interest(k) = 0 < abs(lines(k).theta) && abs(lines(k).theta) < 15;
     if line_of_interest(k) == true
 
         %line_left
-        if lines(k).point1(1) < x_bb_half && lines(k).point2(1) < x_bb_half
-            disp('left line')
+        if lines(k).point1(1) < x_bb_2_3_left && lines(k).point2(1) < x_bb_2_3_left
             len = norm(lines(k).point1 - lines(k).point2);
-            if (len > max_len_left)
-            max_len_left = len;
+            disp(strcat('left line, total nr. : ', num2str(k), 'length: ', num2str(len)));
+            if (len > 1.1*max_len_left) && (len > round(1/3*(y3-y1)))
+                max_len_left = len;
                 % endpoint of longest top line
                 xy_bb_left = [lines(k).point1; lines(k).point2];
             end
-            figure(3)
+            figure(11)
             hold on
             plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
         %line_right
-        elseif lines(k).point1(1) > x_bb_half && lines(k).point2(1) > x_bb_half
+        elseif lines(k).point1(1) > x_bb_1_3_right && lines(k).point2(1) > x_bb_1_3_right
             disp('right line')
             len = norm(lines(k).point1 - lines(k).point2);
-            if (len > max_len_right)
+            if (len > 1.1*max_len_right) && (len > round(1/3*(y3-y1)))
                 max_len_right = len;
                 % endpoint of longest bot line
                 xy_bb_right = [lines(k).point1; lines(k).point2];
             end
-            figure(3)
+            figure(11)
             hold on
             plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
         end
