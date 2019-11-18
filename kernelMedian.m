@@ -28,8 +28,10 @@ end
 img_kernel = depth_img(y-k_half:y+k_half, x-k_half:x+k_half);
 
 % get the locations of nonzero 
-nonzero_idx = find(img_kernel~=0);
+nonzero_idx = img_kernel>0;
+img_kernel_non_zero = img_kernel(nonzero_idx);
+
 % median of the non zero entries
-med = median(img_kernel(nonzero_idx));
+med = median(img_kernel_non_zero);
 
 end
