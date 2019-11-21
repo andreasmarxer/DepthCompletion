@@ -1,6 +1,7 @@
 clear; close all; clc;
 
 filename = '/media/andreas/SanDiskSSD/Semester_Thesis/ros_recording/2019-10-15-17-48-49_original.bag';
+%filename = '/media/andreas/SanDiskSSD/Semester_Thesis/ros_recording/z_calibration_etc/calib.bag';
 bag = rosbag(filename);
 bagInfo = rosbag('info',filename);
 
@@ -40,7 +41,7 @@ for frame = 1:1:length_1
     % (tf msg has a bit different structure than image messages)
     topic_frame_msg_cell_1 = readMessages(topic_bag_1, frame); % take image message of frames of bag
     topic_frame_msg_1 = topic_frame_msg_cell_1{1}; % extract from cell
-    if topic_frame_msg_1.Transforms.Header.FrameId == "mission"
+    if topic_frame_msg_1.Transforms.tf2_TFmessag.FrameId == "mission"
         msg_time_1 = return_msg_time_tf2_msg(topic_frame_msg_1);
         msg_time_vec_1(frame) = msg_time_1;
     end
@@ -90,21 +91,25 @@ idx_pose_all3 = idx_pose_depth(1:num_corr_all);
     
 %% Debugging
 
-% for i = 1:10
-%     msg_time_vec_1(idx_pose_all3(i))-msg_time_vec_2(idx_depth_all3(i))
-%     msg_time_vec_1(idx_pose_all3(i))-msg_time_vec_3(idx_rgb_all3(i))
-%     msg_time_vec_2(idx_depth_all3(i))-msg_time_vec_3(idx_rgb_all3(i))
-% end
+for i = 1:10
+    msg_time_vec_1(idx_pose_all3(i))-msg_time_vec_2(idx_depth_all3(i))
+    msg_time_vec_1(idx_pose_all3(i))-msg_time_vec_3(idx_rgb_all3(i))
+    msg_time_vec_2(idx_depth_all3(i))-msg_time_vec_3(idx_rgb_all3(i))
+end
 
 %% save data
-for label = 1:1:num_corr_all
+%for label = 1:1:num_corr_all
+for label = 100:1:199
+    label_write = label-99;
     % rgb
-    plot_save_img(topic_bag_3, idx_rgb_all3(label), type_3, label, rotation, print, save_img, save_mat, 'jpg');
+    plot_save_img(topic_bag_3, idx_rgb_all3(label), type_3, label_write, rotation, print, save_img, save_mat, 'jpg');
     % depth
-    plot_save_img(topic_bag_2, idx_depth_all3(label), type_2, label, rotation, print, save_img, save_mat, 'png');
+    plot_save_img(topic_bag_2, idx_depth_all3(label), type_2, label_write, rotation, print, save_img, save_mat, 'png');
     % pose
     if save_pose == true
-        log_save_pose(topic_bag_1, label, idx_pose_all3(label))
+        log_save_pose(topic_bag_1, label_write, idx_pose_all3(label))
+        covariance_matrix = zeros(6,6);
+        log_save_info(label_write, covariance_matrix)
     end
 end
 
@@ -223,7 +228,7 @@ function plot_save_img(topic_bag, frame, label, type, rotation, print, save_img,
             % convert Nans to zeros
             img(isnan(img))=0;
             % convert from m to mm
-            %img = img * 1000;  
+            img = img * 1000;  
             % convert to uint16
             img_uint16 = uint16(img);
             imwrite(img_uint16, filename, 'fmt', 'png');
@@ -245,13 +250,7 @@ function pose = return_pose_tf2_msg(topic_bag, frame)
     % get frame message
     topic_frame_msg_cell = readMessages(topic_bag, frame); % take image message of frames of bag
     topic_frame_msg = topic_frame_msg_cell{1}; % extract from cell
-
-    % translation
-    t_x = topic_frame_msg.Transforms.Transform.Translation.X;
-    t_y = topic_frame_msg.Transforms.Transform.Translation.Y;
-    t_z = topic_frame_msg.Transforms.Transform.Translation.Z;
-    t_1 = 1;
-    T = [t_x; t_y; t_z; t_1];
+    
     % rotation
     q_x = topic_frame_msg.Transforms.Transform.Rotation.X;
     q_y = topic_frame_msg.Transforms.Transform.Rotation.Y;
@@ -259,11 +258,24 @@ function pose = return_pose_tf2_msg(topic_bag, frame)
     q_w = topic_frame_msg.Transforms.Transform.Rotation.W;
     quat = [q_w, q_x, q_y, q_z];
 
-    R = quat2rotm(quat);
+    R_cw = quat2rotm(quat);
+    R_wc = R_cw';
+    
+    % translation
+    t_x = topic_frame_msg.Transforms.Transform.Translation.X;
+    t_y = topic_frame_msg.Transforms.Transform.Translation.Y;
+    t_z = topic_frame_msg.Transforms.Transform.Translation.Z;
+    t_1 = 1;
+    
+    t_cw = [t_x; t_y; t_z];
+    t_wc = -R_wc*t_cw;
+    T_wc = [t_wc; 1];
+    
+    
     % return pose
     pose = zeros(4,4);
-    pose(1:3,1:3) = R;
-    pose(1:4,4) = T;
+    pose(1:3,1:3) = R_wc;
+    pose(1:4,4) = T_wc;
     
     return
     
@@ -279,4 +291,20 @@ function log_save_pose(topic_bag, label, frame)
         fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(3,1), m(3,2), m(3,3), m(3,4) );
         fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(4,1), m(4,2), m(4,3), m(4,4) );
         fclose(fid);
+end
+
+
+
+function log_save_info(label, c)
+        fid = fopen('rgbdInfo_open3D.txt','a');
+        fprintf( fid, '%d\t%d\t%d\n', label-1, label-1, label );
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\t%.10f\t%.10f\n', c(1,1), c(1,2), c(1,3), c(1,4), c(1,5), c(1,6) );
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\t%.10f\t%.10f\n', c(2,1), c(2,2), c(2,3), c(2,4), c(2,5), c(2,6) );
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\t%.10f\t%.10f\n', c(3,1), c(3,2), c(3,3), c(3,4), c(3,5), c(3,6) );
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\t%.10f\t%.10f\n', c(4,1), c(4,2), c(4,3), c(4,4), c(4,5), c(4,6) );
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\t%.10f\t%.10f\n', c(5,1), c(5,2), c(5,3), c(5,4), c(5,5), c(5,6) );
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\t%.10f\t%.10f\n', c(6,1), c(6,2), c(6,3), c(6,4), c(6,5), c(6,6) );
+
+
+
 end
