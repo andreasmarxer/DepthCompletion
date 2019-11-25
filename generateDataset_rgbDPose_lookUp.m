@@ -7,7 +7,7 @@ bagInfo = rosbag('info',filename);
 
 %%
 % ==========  settings ===================
-rotation = true;
+rotation = false;
 print = false;
 save_img = false;
 save_pose = true;
@@ -21,28 +21,24 @@ tolerance_depth_rgb = 1/1000; %1ms
 topic_depth = 'medium_resolution/depth_registered/image';
 type_depth = 'depth';
 topic_bag_depth = select(bag, 'Topic', topic_depth);
+length_depth = topic_bag_depth.NumMessages;
+msg_time_vec_depth = zeros(length_depth, 1);
 
 topic_rgb = '/medium_resolution/rgb_undistorted/image';
 type_rgb = 'rgb';
 topic_bag_rgb = select(bag, 'Topic', topic_rgb);
-
-%%
-length_depth = topic_bag_depth.NumMessages;
 length_rgb = topic_bag_rgb.NumMessages;
-msg_time_vec_depth = NaN(length_depth, 1);
-msg_time_vec_rgb = NaN(length_rgb, 1);
-
+msg_time_vec_rgb = zeros(length_rgb, 1);
+%%
 
 for frame = 1:1:length_depth
     msg_time_depth = return_msg_time(topic_bag_depth, frame);
     msg_time_vec_depth(frame) = msg_time_depth;
-    
 end
 
 for frame = 1:1:length_rgb
     msg_time_rgb = return_msg_time(topic_bag_rgb, frame);
     msg_time_vec_rgb(frame) = msg_time_rgb;
-    
 end
 
 %% calculate correspondance indexes between depth image and rgb images
@@ -75,26 +71,53 @@ end
 
 
 %% LAUNCH simulation time
-% start this section
-% PLAY ROS BAG after
-%!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+%% start this section
+%% PLAY ROS BAG after
+%% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 %% lookup and save pose
+clear tf; clear tf_tree;
 
-if save_pose == true
-    %rosinit; 
-    tf_tree = rostf; % is an ongoing variable
-    
-    while size(tf_tree.AvailableFrames,1) == 0
-        disp('waiting')
-    end
+% if save_pose == true
+%     rosinit; 
+%     tf_tree = rostf; % is an ongoing variable
+%     tf_tree.BufferTime = Inf; % standard is 10, but not enough fails at 365
+%     
+%     while size(tf_tree.AvailableFrames,1) == 0
+%         disp('waiting')
+%     end
+    date_str = date;
+    temp = clock;
+    time_str = strcat('-', num2str(temp(4)), 'h-', num2str(temp(5)));
+    filename = strcat(date_str, time_str, 'rgbdPose_open3D');
+    %for c = 1:num_corr
     for c = 1:num_corr
-        tf = getTransform(tf_tree, 'imu', 'mission', msg_time_vec_depth(c), "Timeout", 5);
-        log_save_pose_lookedup(c, tf)
+        % get msg_time_vec_1 and idx_pose_all3 from generateDataset_rgbDP
+        %tf = getTransform(tf_tree, 'mission', 'imu', msg_time_vec_pose_all(idx_pose_all(c)), "Timeout", 20);
+        % --> should be the same as without lookup !!!
+        
+        %ORIGINAL LOOKUP
+        %tf = getTransform(tf_tree, 'mission', 'imu', msg_time_vec_depth(idx_depth_rgb(c)), 'Timeout', Inf);
+        
+        tf = getTransform(bag, 'mission', 'camera0', msg_time_vec_depth(idx_depth_rgb(c)));
+        % tragetframe first, sourceframe second !!!
+%         time_part_s = tf.Header.Stamp.Sec;
+%         time_part_ns = tf.Header.Stamp.Nsec;
+%         time_s = time_part_s + time_part_ns/10^9;
+% %         
+        disp(c)
+        disp(msg_time_vec_depth(idx_depth_rgb(c))) % ORIGINAL
+        %disp(msg_time_vec_pose_all(idx_pose_all(c)))
+%         disp('Found tf - header time')
+%         disp(time_s)
+%         disp('=======================')
+        log_save_pose_lookedup(c, tf, filename)
     end
-end
+%end
+%%
 
+%log_save_pose_lookedup(1, test, 'test')
 
 %% functions
 
@@ -233,16 +256,32 @@ function plot_save_img(topic_bag, frame, label, type, rotation, print, save_img,
 end
 
 
-function pose = return_pose_tfStamped_msg(tf)
+function log_save_pose_lookedup(label, tf, filename)
+        fid = fopen(filename,'a');
+        fprintf( fid, '%d\t%d\t%d\n', label-1, label-1, label );
+        
+        invert = false;
+        m = return_pose_tfStamped_msg(tf, invert);
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(1,1), m(1,2), m(1,3), m(1,4) );
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(2,1), m(2,2), m(2,3), m(2,4) );
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(3,1), m(3,2), m(3,3), m(3,4) );
+        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(4,1), m(4,2), m(4,3), m(4,4) );
+        fclose(fid);
+end
+
+
+function pose = return_pose_tfStamped_msg(tf, invert)
     % rotation
     q_x = tf.Transform.Rotation.X;
     q_y = tf.Transform.Rotation.Y;
     q_z = tf.Transform.Rotation.Z;
     q_w = tf.Transform.Rotation.W;
     quat = [q_w, q_x, q_y, q_z];
-
+    
     R_cw = quat2rotm(quat);
-    %R_wc = R_cw';
+    if invert == true
+        R_wc = R_cw';
+    end
     
     % translation
     t_x = tf.Transform.Translation.X;
@@ -252,32 +291,38 @@ function pose = return_pose_tfStamped_msg(tf)
     
     t_cw = [t_x; t_y; t_z];
     T_cw = [t_cw; 1];
-    %t_wc = -R_wc*t_cw;
-    %T_wc = [t_wc; 1];
-    
+    if invert == true
+        t_wc = -R_wc*t_cw;
+        T_wc = [t_wc; 1];
+    end
     
     % return pose
     pose = zeros(4,4);
-    pose(1:3,1:3) = R_cw;
-    pose(1:4,4) = T_cw;
+     
+   if invert == true
+        pose(1:3,1:3) = R_wc;
+        pose(1:4,4) = T_wc;
+   else
+        pose(1:3,1:3) = R_cw;
+        pose(1:4,4) = T_cw;
+   end
     
     return
     
 end
 
 
-function log_save_pose_lookedup(label, tf)
-        fid = fopen('rgbdPose_lookedUp_open3D.txt','a');
+% old functions
+function log_save_pose(topic_bag, label, frame)
+        fid = fopen('rgbdPose_open3D.txt','a');
         fprintf( fid, '%d\t%d\t%d\n', label-1, label-1, label );
-        m = return_pose_tfStamped_msg(tf);
+        m = return_pose_tf2_msg(topic_bag, frame);
         fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(1,1), m(1,2), m(1,3), m(1,4) );
         fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(2,1), m(2,2), m(2,3), m(2,4) );
         fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(3,1), m(3,2), m(3,3), m(3,4) );
         fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(4,1), m(4,2), m(4,3), m(4,4) );
         fclose(fid);
 end
-
-% old functions
 
 function pose = return_pose_tf2_msg(topic_bag, frame)
     % get frame message
@@ -312,18 +357,6 @@ function pose = return_pose_tf2_msg(topic_bag, frame)
     
     return
     
-end
-
-
-function log_save_pose(topic_bag, label, frame)
-        fid = fopen('rgbdPose_open3D.txt','a');
-        fprintf( fid, '%d\t%d\t%d\n', label-1, label-1, label );
-        m = return_pose_tf2_msg(topic_bag, frame);
-        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(1,1), m(1,2), m(1,3), m(1,4) );
-        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(2,1), m(2,2), m(2,3), m(2,4) );
-        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(3,1), m(3,2), m(3,3), m(3,4) );
-        fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(4,1), m(4,2), m(4,3), m(4,4) );
-        fclose(fid);
 end
 
 function log_save_info(label, c)
