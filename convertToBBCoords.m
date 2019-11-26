@@ -1,4 +1,10 @@
 function [x1, y1, x2, y2, x3, y3, x4, y4 ] = convertToBBCoords(left_x, top_y, width, height, img)
+% convert YOLOv3 format to corner point in [px] of bounding box
+% input:    one bounding box in YOLOv3 prediction format
+%           left_x, top_y: coordinates of top left point in [px]
+%           width, height: width and height of bb in [px]
+% output:   coordnates of corners from bounding box in pixel
+%           convention: 1=top left, 2=top right, 3=bottom right, 4=bottom left !!!
 
 % top left
 x1 = left_x;
@@ -22,7 +28,7 @@ y4 = y3;
 
 
 
-%% Check if we are at unplottable border point
+%% Check if corners are at unplottable border point
     function [x,y] = imgBorderCheck(x,y, img)
 
     img_height = size(img,1);
@@ -35,7 +41,7 @@ y4 = y3;
         end
 
         if y<1
-            y=1; % can plot from 1 on, but only can take kernels from here on
+            y=1; % can plot from 1 on
         elseif y>img_height
             y=img_height;
         end
