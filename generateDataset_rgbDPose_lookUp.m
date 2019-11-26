@@ -8,7 +8,7 @@ bagInfo = rosbag('info',filename);
 % ==============================  settings ================================
 rotation = false;   % need to be false for matching with pose
 print = false;      % print images as figures
-save_img = false;   % save images (depth png, rgb jpeg)
+save_img = true;   % save images (depth png, rgb jpeg)
 save_mat = false;   % save image additionaly as array
 save_pose = true;   % save pose in file.txt (for Open3D rename to .log)
 debug = true;       % print msgs for debugging
@@ -41,7 +41,7 @@ end
 
 %% calculate correspondance indexes of header times between depth and rgb
 
-[idx_rgb_depth, idx_depth_rgb, ~] = return_idx(msg_time_vec_rgb, msg_time_vec_depth, tolerance_depth_rgb);
+[idx_rgb_depth, idx_depth_rgb] = return_idx(msg_time_vec_rgb, msg_time_vec_depth, tolerance_depth_rgb);
 num_corr = size(idx_rgb_depth,1);
     
 %% debugging
@@ -67,8 +67,8 @@ for label = 1:num_corr
     label_write = label;
     
     if debug == true
-        disp(c)
-        disp(msg_time_vec_depth(idx_depth_rgb(c)))
+        disp(label)
+        disp(msg_time_vec_depth(idx_depth_rgb(label)))
     end
     
     % rgb part
@@ -76,8 +76,8 @@ for label = 1:num_corr
     % depth part
     plot_save_img(topic_bag_depth, idx_depth_rgb(label), type_depth, label_write, rotation, print, save_img, save_mat, 'png');
     % pose lookup for calculated times (only available in bag until frame 372!)
-    tf = getTransform(bag, 'mission', 'camera0', msg_time_vec_depth(idx_depth_rgb(c)));
-    log_save_pose_lookedup(c, tf, filename)
+    tf = getTransform(bag, 'mission', 'camera0', msg_time_vec_depth(idx_depth_rgb(label)));
+    log_save_pose_lookedup(label, tf, filename)
 end
 
 
@@ -147,7 +147,15 @@ for k_short=1:1:size(short_vec,1)
     else
         disp('No correspondant found')
     end
+   
+end
 
+% cut the vectors after last correspondence
+if nnz(idx_long) == nnz (idx_short)
+idx_long = idx_long(1:nnz(idx_long));
+idx_short = idx_short(1:nnz(idx_short));
+else
+print('Error in calculation, correspondent numbers not equal !')
 end
 
 return
