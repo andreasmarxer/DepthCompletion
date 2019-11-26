@@ -4,12 +4,19 @@ clear; clc; close all;
 
 %%%%%%%%%%%%%%%%%%%
 ploting = true;
+rotate_back = true; % rotate the processed image before saving png
+% images need to have corrected upright  view due to prediction bouding box format
 debug = false;
 save = false;
-label = 198; 
+label = 0;
 % edge detector horizontal tunned with 366
-% 126: nned 0.1 threshold for peaks !!
-% working well: 198, 366, 126, 367, 131
+% working well % % % % % % % % 
+% 126, 131: one open door
+% 198:      one side door    
+% 303, 304: one dark door
+% 360:      two doors
+% 366, 367: one open door
+% % % % % % % % % % % % % % % %
 % FAILS: 52, 298, 301, 302
 %%%%%%%%%%%%%%%%%%%
 
@@ -18,9 +25,6 @@ kernel = 5;
 kernel_half = (kernel-1)/2;
 raster_correction = true; % correct missing depth pixels with kernel
 
-% depth adaptation
-depth_method = 1; %1 = only z treshold, 2 = only angle threshold, 3 = combination
-
 depth_procentual_th = 0.25; % [%] of depth measurements available
 inlier_th = 50; %[mm] distance to plane that is considered as inlier
 bb_width = 7; %must be odd number, width of frame around bb
@@ -28,13 +32,13 @@ inside = true; %if true also bb_width/2 inside the bb area
 
 confidence_th = 95; % [%] above which prediction confidence consider window
 
-area_th = 1/9; %procentage of area from bb that the triangle of chosen points must cover
+area_th = 1/9; % procentage of area from bb that the triangle of chosen points must cover
 
 asl_train_labels = [1,16,39,90,128,178,199,221,264,269,283,289,307,337,...
                     350,355,361,363,365,368];           
                 
 if label == 0
-    label_array = 1:1:70;
+    label_array = 1:1:488; 
 else
     label_array = label;
 end
@@ -52,6 +56,7 @@ for label = label_array
 
         path = '/home/andreas/Documents/ASL_window_dataset/';
         depth_filename = strcat(path, 'depth_images_mm/' ,'asl_window_', num2str(label), '_depth', '.png');
+        depth_filename_median = strcat(path, 'depth_images_median5/','asl_window_', num2str(label), '_depth_median5', '.png');
         bb_filename = strcat(path, 'rgb_images_predictions/' ,'asl_window_', num2str(label), '_rgb', '.txt');
         rgb_filename = strcat(path, 'rgb_images/' ,'asl_window_', num2str(label), '_rgb', '.jpg');
         [class, confidence, left_x_vec, top_y_vec, width_vec, height_vec] = importBoundingBoxes(bb_filename);
@@ -65,30 +70,26 @@ for label = label_array
         
         disp(strcat(num2str(nnz(windows_conf)), {' from '} , num2str(size(windows_conf,1)), ' windows with enough confidence considered'));
         
-        %% depth image
-        depth_img = imread(depth_filename); % meters
-
-        % correcting rastered holes
-        if raster_correction == true
-            depth_img_woraster = depth_img;
-
-            for x = kernel_half+1:1:size(depth_img,2)-kernel_half
-                for y = kernel_half+1:1:size(depth_img,1)-kernel_half
-                    depth_img_woraster(y,x) = kernelMedian(3,x,y,depth_img);
-                end
-            end
-
-            depth_img = depth_img_woraster;
-        end
+        %% median filtered (kernel 5x5) depth image
+        depth_img = imread(depth_filename_median); % meters
 
         if ploting == true
             figure(1)
             visualize_depth_png(depth_img)  % millimeters
             title(strcat('Depth Image corrected with nonzero median filter (k=', num2str(kernel), ') - Frame : ', num2str(label)));
+            % plots predicted bounding box corner points
             plot_bb(left_x_vec,top_y_vec,width_vec,height_vec,depth_img);
             pause(0.2) % otherwise sometimes this isn't plotted
         end
-
+        
+        %% rgb image
+        if ploting == true
+            figure(2)
+            imshow(rgb_filename)
+            % plots predicted bounding box corner points
+            plot_bb(left_x_vec,top_y_vec,width_vec,height_vec,depth_img);
+            pause(0.2)
+        end
         %% adjust the depth
         % initialization
         depth_img_adj = depth_img;
@@ -111,38 +112,36 @@ for label = label_array
                 bb_width_scale = 0:1:bb_width-1;
             end          
             
-            % edge detection
-            [y_top, y_bot, x_left, x_right] = holeEdgeShit(depth_img_woraster, x1, x2, y1, y3, bb_width, debug);
-            
+            %% edge detection
+            % get edge functions
+            [y_top, y_bot, x_left, x_right] = holeEdgeShit(depth_img, ...
+                x1, x2, y1, y3, bb_width, debug);
             
             % get intersections of edge function
-            x_vec = x1:x2;
-            xs1 = find( x_left( y_top( x_vec ) ) == x_vec )+x1-1;
-            ys1 = y_top(xs1);
-            
-            xs2 = find( x_right( y_top( x_vec ) ) == x_vec )+x1-1;
-            ys2 = y_top(xs2);
-            
-            xs3 = find( x_right( y_bot( x_vec ) ) == x_vec )+x1-1;
-            ys3 = y_bot(xs3);
-            
-            xs4 = find( x_left( y_bot( x_vec ) ) == x_vec )+x1-1;
-            ys4 = y_bot(xs4);
+            [xs1, ys1, xs2,ys2, xs3,ys3, xs4,ys4] = getIntersectionEdges(...
+                x1, x2, y_top, y_bot, x_left, x_right);
             
             % 1. get bounding box edge frame coordinates
-            [points_x, points_y] = getEdgeframeCoordinates(xs1,ys1, xs2,ys2, xs3,ys3, xs4,ys4, y_top, y_bot, x_left, x_right, bb_width, bb_width_scale, depth_img);
-            
+            [points_x, points_y] = getEdgeframeCoordinates(xs1,ys1,...
+                xs2,ys2, xs3,ys3, xs4,ys4, y_top, y_bot, x_left, x_right,...
+                bb_width, bb_width_scale, depth_img);
             
             % plot rgb image with edges etc.
             %% rgb image
             if ploting == true
                 figure(2)
-                imshow(rgb_filename)
-                plot_bb(left_x_vec,top_y_vec,width_vec,height_vec,depth_img);
-                pause(0.2)
                 hold on
-                plot(points_x, points_y,'.');
+                plot(x1:x2, y_top(x1:x2))
                 hold on
+                plot(x_right(y2:y3), y2:y3)
+                hold on
+                plot(x1:x2, y_bot(x1:x2))
+                hold on
+                plot(x_left(y2:y3), y2:y3)
+                hold on
+%                 hold on
+%                 plot(points_x, points_y,'.');
+%                 hold on
                 plot([xs1;xs2;xs3;xs4],[ys1;ys2;ys3;ys4], 'y+');
                 hold on
             end
@@ -189,10 +188,6 @@ for label = label_array
                 %% fit plane
                 % initialize not unique!
                 random3 = ones(1,3);
-                %disp(strcat('RANSAC iteration: ', num2str(ransac_it)));
-
-                % crit = FALSE -> make RANSAC
-                % crit = TRUE  -> random pick point again
 
                 % initialize
                 must_ransac_crit = 1;
@@ -263,12 +258,9 @@ for label = label_array
 
             disp(strcat('Window: ', num2str(window), ' Best inlier ratio: ', num2str(best_inlier/size(points_z,1)), ' Best std: ', num2str(best_std)));
             disp(strcat('Iterations skipped : ', num2str(ransac_it_skipped)));
-            if depth_method ~=1
-                disp(strcat('Best theta: ', num2str(best_theta), 'Best phi: ', num2str(best_phi)));
-            end
 
             % camera parameters (saved fram CameraInfo topic in RosBag)
-            load('/home/andreas/Documents/DepthAdaptation/K.mat');
+            load('data/K.mat');
 
             % adjust depth image for each pixel inside actual window
             for x = x1:1:x2
@@ -324,6 +316,7 @@ for label = label_array
             visualize_depth_png(depth_img_adj)
             pause(0.2)
             title(strcat('Corrected depth image (k=', num2str(kernel), ') with RANSAC plane fitted windows - Frame : ', num2str(label)));
+            % plots predicted bounding box corner points
             plot_bb(left_x_vec, top_y_vec, width_vec, height_vec, depth_img);
             pause(0.5) % otherwise sometimes this isn't plotted
             if size(plane_pts,1) ~=0
@@ -340,7 +333,7 @@ for label = label_array
 
         %%
         if save == true
-            adjDepth2PngImage(depth_img_adj, label)
+            adjDepth2PngImage(depth_img_adj, label, rotate_back)
             pause(0.2); % otherwise some images don't get saved
         end
         
@@ -398,7 +391,7 @@ points_X_c = zeros(size(points_z,1),1);
 points_Y_c = zeros(size(points_z,1),1);
 
 % camera parameters (saved fram CameraInfo topic in RosBag)
-load('K.mat');
+load('data/K.mat');
 K_inv = inv(K);
 
     for i=1:size(points_z,1)
@@ -490,7 +483,8 @@ function [points_x, points_y] = getEdgeframeCoordinates(xs1,ys1, xs2,ys2, xs3,ys
     bb_width_half = (bb_width-1)/2;
     
     % care, this now are non square boxes anymore !!!
-    if xs1-bb_width>1 && xs4>1 && ys1-bb_width>1 && ys2-bb_width>1
+    if xs1-bb_width>1 && xs4-bb_width>1 && ys1-bb_width>1 && ys2-bb_width>1 ...
+        && xs3+bb_width < size(depth_img,2) && ys4+bb_width < size(depth_img,1)
         % can make nice corner overlaps
         points_x_12 = repmat((xs1-bb_width_half:xs2-bb_width_half-1)', bb_width, 1);
         points_y_23 = repmat((ys2-bb_width_half:ys3-bb_width_half-1)', bb_width, 1);
@@ -790,12 +784,13 @@ for x = x_
 end
 
 for y = y_
-    if xy_bb_left ~= 0
+    if size(xy_bb_left,1) ~= 1 && ~(xy_bb_left(1,1)==xy_bb_left(2,1)) 
+        %2nd criterion is due to singularity of function y=f(x) can't map x=2
         x_left(y) = bbPoints2XEdgeBorder(y, xy_bb_left, x1, x2, y1);
     else
         x_left(y) = x1;
     end
-    if xy_bb_right ~= 0
+    if size(xy_bb_right,1) ~= 1 && ~(xy_bb_right(1,1)==xy_bb_right(2,1))
         x_right(y) = bbPoints2XEdgeBorder(y, xy_bb_right, x1, x2, y1);
     else
         x_right(y) = x2;
@@ -809,7 +804,51 @@ x_left = round(x_left);
 x_right= round(x_right);
 
 end
+
+
+function [xs1, ys1, xs2,ys2, xs3,ys3, xs4,ys4] = getIntersectionEdges(x1, x2, y_top, y_bot, x_left, x_right)
+            % get intersections of edge function
+            x_vec = x1:x2;
             
+            xs1 = find( x_left( y_top( x_vec ) ) == x_vec )+x1-1;
+            % no intersection on discrete pixel value
+            if size(xs1,2) == 0 
+                xs1 = find( x_left( y_top( x_vec -1 ) ) == x_vec )+x1-1;
+            % no unambigous intersection (multiple)
+            elseif size(xs1,2) > 1
+                xs1 = xs1(1);
+            end
+            ys1 = y_top(xs1);
+            
+            xs2 = find( x_right( y_top( x_vec ) ) == x_vec )+x1-1;
+            if size(xs2,2) == 0 % xs4 ot found does not exist
+                % intersection may is not in the pixel center
+                xs2 = find( x_right( y_top( x_vec -1 ) ) == x_vec )+x1-1;
+            elseif size(xs2,2) > 1
+                xs2 = xs2(1);
+            end
+            ys2 = y_top(xs2);
+            
+            xs3 = find( x_right( y_bot( x_vec ) ) == x_vec )+x1-1;
+            if size(xs3,2) == 0 % xs4 ot found does not exist
+                % intersection may is not in the pixel center
+                xs3 = find( x_right( y_bot( x_vec -1 ) ) == x_vec )+x1-1;
+            elseif size(xs3,2) > 1
+                xs3 = xs3(1);
+            end
+            ys3 = y_bot(xs3);
+            
+            xs4 = find( x_left( y_bot( x_vec ) ) == x_vec )+x1-1;
+            if size(xs4,2) == 0 % xs4 ot found does not exist
+                % intersection may is not in the pixel center
+                xs4 = find( x_left( y_bot( x_vec-1 ) ) == x_vec )+x1-1;
+            elseif size(xs4,2) > 1
+                xs4 = xs4(1);
+            end
+            ys4 = y_bot(xs4);
+end
+
+
 function param = pts2line(xy)
 % input:    xy = [x1, y1; x2, y2]
 % output:   param = [a; b] for fitting line y = ax + b
@@ -865,16 +904,20 @@ end
 
 %% save image
 
-function adjDepth2PngImage(depth_img_adj, label)
+function adjDepth2PngImage(depth_img_adj, label, rotate_back)
     
-% make changes here ---------------------------------------------------
-    type = 'depth_adj';
-    filepath =  '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/temp/';
-    % ---------------------------------------------------------------------
-    
-    img = depth_img_adj;
+% make changes here -------------------------------------------------------
+type = 'depth_adj';
+filepath =  '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/temp/';
+% -------------------------------------------------------------------------
 
-    filename = strcat('asl_window_', num2str(label), '_', num2str(type), '.png');
-    imwrite(img, strcat(filepath, filename), 'fmt', 'png');
+if rotate_back == true
+    img = imrotate(depth_img_adj, 180);
+else
+    img = depth_img_adj;
+end
+
+filename = strcat('asl_window_', num2str(label), '_', num2str(type), '.png');
+imwrite(img, strcat(filepath, filename), 'fmt', 'png');
 
 end
