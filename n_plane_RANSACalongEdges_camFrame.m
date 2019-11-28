@@ -8,7 +8,7 @@ rotate_back = true; % rotate the processed image before saving png
 % images need to have corrected upright  view due to prediction bouding box format
 debug = false;
 save = false;
-label = 0;
+label = 100:200;
 % edge detector horizontal tunned with 366
 % working well % % % % % % % % 
 % 126, 131: one open door
@@ -71,7 +71,7 @@ for label = label_array
         if ploting == true
             figure(1)
             visualize_depth_png(depth_img)  % millimeters
-            title(strcat('Depth Image corrected with nonzero median filter (k=', num2str(kernel), ') - Frame : ', num2str(label)));
+            title(strcat('Depth Image corrected with nonzero median filter (k=5) - Frame : ', num2str(label)));
             % plots predicted bounding box corner points
             plot_bb(left_x_vec,top_y_vec,width_vec,height_vec,depth_img);
             pause(0.2) % otherwise sometimes this isn't plotted
@@ -167,6 +167,8 @@ for label = label_array
             end
 
             %% 2. convert from image coordinates [px] to camera frame coordinates [mm]
+
+            % use the intrinsics to convert to camera coordinates
             P_all = [points_x, points_y, points_z];
             [points_X_c, points_Y_c, points_Z_c] = pixel2camCoordinate(P_all);
                             
@@ -309,7 +311,7 @@ for label = label_array
             pause(0.2)
             visualize_depth_png(depth_img_adj)
             pause(0.2)
-            title(strcat('Corrected depth image (k=', num2str(kernel), ') with RANSAC plane fitted windows - Frame : ', num2str(label)));
+            title(strcat('Corrected depth image (k=5) with RANSAC plane fitted windows - Frame : ', num2str(label)));
             % plots predicted bounding box corner points
             plot_bb(left_x_vec, top_y_vec, width_vec, height_vec, depth_img);
             pause(0.5) % otherwise sometimes this isn't plotted
@@ -378,7 +380,7 @@ end
 
 
 function [points_X_c, points_Y_c, points_Z_c] = pixel2camCoordinate(P_all)
-% convert pixel coordinates to camera coordinates
+% convert pixel coordinates (in overhead view / ros bag format) to camera coordinates
 % input     u,v are pixel coordinates (origin top left), z is depth [mm]
 % output:   x,y,z in camera frame [mm] (origin at cx, cy see in intrinsics)
 
@@ -404,6 +406,34 @@ K_inv = inv(K);
 
 end
 
+
+function [points_X_c, points_Y_c, points_Z_c] = pixelNormalView2camCoordinate(P_all)
+% convert pixel coordinates of normal (not overhead) view to camera coordinates
+% input     u,v are pixel coordinates (origin top left), z is depth [mm]
+% output:   x,y,z in camera frame [mm] (origin at cx, cy see in intrinsics)
+
+points_x = P_all(:,1);
+points_y = P_all(:,2);
+points_z = P_all(:,3);
+
+% initialization
+points_Z_c = points_z;
+points_X_c = zeros(size(points_z,1),1);
+points_Y_c = zeros(size(points_z,1),1);
+
+% camera intrinsic (saved fram CameraInfo topic in RosBag)
+load('data/K_normalView.mat');
+K_inv = inv(K_normalView);
+
+% convert to camera coordinates
+    for i=1:size(points_z,1)
+        rho = points_Z_c(i);
+        XY_c = K_inv(1:2,1:3) .* rho *  [points_x(i); points_y(i); 1];
+        points_X_c(i) = -XY_c(1); % needed because of 180° rotation around optical center
+        points_Y_c(i) = -XY_c(2); % needed because of 180° rotation around optical center
+    end
+
+end
 
 function distance = dist2plane(P, param)
 % input:    P = [x1, y1, z1; x2, y2, z2; x3, y3, z3; ... ; xN, yN, zN]
