@@ -67,17 +67,19 @@ points_y = [points_y_12; points_y_23; points_y_34; points_y_41];
 
 %% check if still inside image
 % right border
-points_x = points_x(points_x<size(depth_img,2));
 points_y = points_y(points_x<size(depth_img,2));
+points_x = points_x(points_x<size(depth_img,2));
 % bottom border
-points_y = points_y(points_y<size(depth_img,1));
 points_x = points_x(points_y<size(depth_img,1));
+points_y = points_y(points_y<size(depth_img,1));
+
 % left border
-points_x = points_x(points_x>0);
 points_y = points_y(points_x>0);
+points_x = points_x(points_x>0);
+
 % top border
-points_y = points_y(points_y>0);
 points_x = points_x(points_y>0);
+points_y = points_y(points_y>0);
 
 return;
     
