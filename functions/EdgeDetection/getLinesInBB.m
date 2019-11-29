@@ -30,17 +30,29 @@ Peaks  = houghpeaks(Hough, num_peaks, 'threshold', ceil(0.2*max(Hough(:)))); % p
 %Peaks2  = houghpeaks(Hough2, num_peaks, 'threshold', ceil(0.5*max(Hough2(:)))); % peak
 
 % 3. find lines
-a = 0.0741;
-b = 7.7778;
+a = 0.04;
+b = 6;
 fill_gap_th = round(a*(x2-x1)+b);
-min_lenght_th = round(1/3*(x2-x1));
+min_lenght_th = round(1/4*(x2-x1));
 lines = houghlines(BW, Theta, Rho, Peaks, 'FillGap', fill_gap_th, 'MinLength', min_lenght_th);
 
 if debug == true
+    figure(9)
+    imshow(BW)
+    pause(0.2)
+    hold on
+    for k = 1:length(lines)
+%         disp(num2str(depth_img_woraster(lines(k).point1(2), lines(k).point1(1))));
+%         disp(num2str(depth_img_woraster(lines(k).point2(2), lines(k).point2(1))));
+        plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+    end
     figure(10)
     imshow(BW)
-    hold on
+    pause(0.2)
     figure(11)
     imshow(BW)
-    hold on
+    pause(0.2)
+    figure(12)
+    imshow(BW)
+    pause(0.2)
 end
