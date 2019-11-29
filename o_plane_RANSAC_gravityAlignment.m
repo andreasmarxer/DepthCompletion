@@ -8,7 +8,7 @@ rotate_back = true; % rotate the processed image before saving png
 % images need to have corrected upright  view due to prediction bouding box format
 debug = true;
 save = false;
-label = 198;
+label = 126;
 % edge detector horizontal tunned with 366
 % working well % % % % % % % % 
 % 126, 131: one open door
@@ -106,67 +106,67 @@ for label = label_array
             lines = getLinesInBB(depth_img, x1, x2, y1, y3, bb_width, debug);
             
             %% gravity check
-            for k = 1:length(lines)
-                % initialization
-                points_z = zeros(2,1);
-                kernel = 5;
-                
-                while any(points_z == 0)
-                    points_x = [lines(k).point1(1); lines(k).point2(1)];
-                    points_x = points_x + x1;
-                    points_y = [lines(k).point1(2); lines(k).point2(2)];
-                    points_y = points_y + y1;
-                    points_z = [kernelMedian(kernel, points_x(1), points_y(1), depth_img);
-                                kernelMedian(kernel, points_x(2), points_y(2), depth_img)];
-                    if any(points_z == 0)
-                        kernel = kernel + 1;
-                        disp(strcat('Increased kernel: ', num2str(kernel)));
-                    end
-                end
-                figure(2)
-                hold on
-                plot(points_x, points_y,'LineWidth',2);            
-                
-                P_line = [points_x, points_y, points_z];
-                [X_c_line, Y_c_line, Z_c_line] = pixelNormalView2camCoordinate(P_line);
-                P_c_line = [X_c_line'; Y_c_line'; Z_c_line'];
-                load('data/poses_lookedUp.mat'); % loaded as poses
-                % convert translation from [m] to [mm]
-                poses(1:3,4,label) = poses(1:3,4,label)*1000;
-                T_wc = poses(:,:,label);
-
-                P =   T_wc * [P_c_line; ones(1,size(P_c_line,2))];
-                P_w_line = P(1:end-1,:);
-                
-                % vectors
-                V_line = P_w_line(:,1)-P_w_line(:,2);
-                V_z = [0;0;1];
-                angle2zAxis = rad2deg(acos( (V_line'*V_z) / (norm(V_line))))
-                lines(k).angle2z = angle2zAxis;
-%                 figure(5); 
-%                 scatter3(P_w_line(1,:), P_w_line(2,:), P_w_line(3,:) ,'x')
-%                 xlabel('X_w')
-%                 ylabel('Y_w')
-%                 zlabel('Z_w')
-
-                if lines(k).angle2z < 2
-                    figure(13)
-                    hold on
-                    plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
-                elseif lines(k).angle2z < 92 && lines(k).angle2z > 88
-                    figure(14)
-                    hold on
-                    plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
-                end
-            end
+%             for k = 1:length(lines)
+%                 initialization
+%                 points_z = zeros(2,1);
+%                 kernel = 5;
+%                 
+%                 while any(points_z == 0)
+%                     points_x = [lines(k).point1(1); lines(k).point2(1)];
+%                     points_x = points_x + x1;
+%                     points_y = [lines(k).point1(2); lines(k).point2(2)];
+%                     points_y = points_y + y1;
+%                     points_z = [kernelMedian(kernel, points_x(1), points_y(1), depth_img);
+%                                 kernelMedian(kernel, points_x(2), points_y(2), depth_img)];
+%                     if any(points_z == 0)
+%                         kernel = kernel + 1;
+%                         disp(strcat('Increased kernel: ', num2str(kernel)));
+%                     end
+%                 end
+%                 figure(2)
+%                 hold on
+%                 plot(points_x, points_y,'LineWidth',2);            
+%                 
+%                 P_line = [points_x, points_y, points_z];
+%                 [X_c_line, Y_c_line, Z_c_line] = pixelNormalView2camCoordinate(P_line);
+%                 P_c_line = [X_c_line'; Y_c_line'; Z_c_line'];
+%                 load('data/poses_lookedUp.mat'); % loaded as poses
+%                 convert translation from [m] to [mm]
+%                 poses(1:3,4,label) = poses(1:3,4,label)*1000;
+%                 T_wc = poses(:,:,label);
+% 
+%                 P =   T_wc * [P_c_line; ones(1,size(P_c_line,2))];
+%                 P_w_line = P(1:end-1,:);
+%                 
+%                 vectors
+%                 V_line = P_w_line(:,1)-P_w_line(:,2);
+%                 V_z = [0;0;1];
+%                 angle2zAxis = rad2deg(acos( (V_line'*V_z) / (norm(V_line))))
+%                 lines(k).angle2z = angle2zAxis;
+% %                 figure(5); 
+% %                 scatter3(P_w_line(1,:), P_w_line(2,:), P_w_line(3,:) ,'x')
+% %                 xlabel('X_w')
+% %                 ylabel('Y_w')
+% %                 zlabel('Z_w')
+% 
+%                 if lines(k).angle2z < 2
+%                     figure(13)
+%                     hold on
+%                     plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+%                 elseif lines(k).angle2z < 92 && lines(k).angle2z > 88
+%                     figure(14)
+%                     hold on
+%                     plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+%                 end
+%             end
             
             % 2. calculte best lines
             % top and bot start and end point in bb coordinates !!!
-            [xy_bb_top, xy_bb_bot] = getTopBotLinesInBB(...
-                lines, y1, y3, x1, x2, debug);
+            [xy_bb_top, xy_bb_bot] = getTopBotLinesInBBwGravity(...
+                lines, y1, y3, x1, x2, depth_img, label, debug);
             % left and right start and end point in bb coordinates !!!
-            [xy_bb_left, xy_bb_right] = getLeftRightLinesInBB(...
-                lines, x1, x2, y1, y3, debug);
+            [xy_bb_left, xy_bb_right] = getLeftRightLinesInBBwGravity(...
+                lines, x1, x2, y1, y3, depth_img, label, debug);
 
             % 3. convert line to function of x coordinate
             [y_top, y_bot, x_left, x_right] = line2functionInBB(...
