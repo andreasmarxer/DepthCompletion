@@ -6,18 +6,19 @@ clear; clc; close all;
 ploting = true;
 rotate_back = true; % rotate the processed image before saving png
 % images need to have corrected upright  view due to prediction bouding box format
-debug = true;
-save = false;
-label = 126;
+debug = false;
+save = true;
+label = 220;
 % edge detector horizontal tunned with 366
 % working well % % % % % % % % 
 % 126, 131: one open door
 % 198:      one side door    
 % 303, 304: one dark door
 % 360:      two doors
-% 366, 367: one open door
+% 366:      one open door
+% 298 now also works
 % % % % % % % % % % % % % % % %
-% FAILS: 52, 298, 301, 302
+% FAILS: 52, 302 due to prediction
 %%%%%%%%%%%%%%%%%%%
 
 depth_procentual_th = 0.25; % [%] of depth measurements available
@@ -34,7 +35,7 @@ asl_train_labels = [1,16,39,90,128,178,199,221,264,269,283,289,307,337,...
                     350,355,361,363,365,368];           
                 
 if label == 0
-    label_array = 1:1:488; 
+    label_array = 1:1:372; 
 else
     label_array = label;
 end
@@ -78,6 +79,8 @@ for label = label_array
         end
         
         %% rgb image
+        rgb_img = imread(rgb_filename);
+        
         if ploting == true
             figure(2)
             imshow(rgb_filename)
@@ -103,78 +106,49 @@ for label = label_array
             %% edge detection
 
             % 1. returns line segments found in bounding box with Canny and Hough Transform
-            lines = getLinesInBB(depth_img, x1, x2, y1, y3, bb_width, debug);
+            lines = getLinesInBB(depth_img, x1, x2, y1, y3, bb_width, debug); %%%%%%% changed to rgb image
+
+            % 2. calculate angle to gravity vector
+            lines = calculateLineAngle2Gravity(lines, x1, y1, depth_img, label, debug);
             
-            %% gravity check
-%             for k = 1:length(lines)
-%                 initialization
-%                 points_z = zeros(2,1);
-%                 kernel = 5;
-%                 
-%                 while any(points_z == 0)
-%                     points_x = [lines(k).point1(1); lines(k).point2(1)];
-%                     points_x = points_x + x1;
-%                     points_y = [lines(k).point1(2); lines(k).point2(2)];
-%                     points_y = points_y + y1;
-%                     points_z = [kernelMedian(kernel, points_x(1), points_y(1), depth_img);
-%                                 kernelMedian(kernel, points_x(2), points_y(2), depth_img)];
-%                     if any(points_z == 0)
-%                         kernel = kernel + 1;
-%                         disp(strcat('Increased kernel: ', num2str(kernel)));
-%                     end
-%                 end
-%                 figure(2)
-%                 hold on
-%                 plot(points_x, points_y,'LineWidth',2);            
-%                 
-%                 P_line = [points_x, points_y, points_z];
-%                 [X_c_line, Y_c_line, Z_c_line] = pixelNormalView2camCoordinate(P_line);
-%                 P_c_line = [X_c_line'; Y_c_line'; Z_c_line'];
-%                 load('data/poses_lookedUp.mat'); % loaded as poses
-%                 convert translation from [m] to [mm]
-%                 poses(1:3,4,label) = poses(1:3,4,label)*1000;
-%                 T_wc = poses(:,:,label);
-% 
-%                 P =   T_wc * [P_c_line; ones(1,size(P_c_line,2))];
-%                 P_w_line = P(1:end-1,:);
-%                 
-%                 vectors
-%                 V_line = P_w_line(:,1)-P_w_line(:,2);
-%                 V_z = [0;0;1];
-%                 angle2zAxis = rad2deg(acos( (V_line'*V_z) / (norm(V_line))))
-%                 lines(k).angle2z = angle2zAxis;
-% %                 figure(5); 
-% %                 scatter3(P_w_line(1,:), P_w_line(2,:), P_w_line(3,:) ,'x')
-% %                 xlabel('X_w')
-% %                 ylabel('Y_w')
-% %                 zlabel('Z_w')
-% 
-%                 if lines(k).angle2z < 2
-%                     figure(13)
-%                     hold on
-%                     plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
-%                 elseif lines(k).angle2z < 92 && lines(k).angle2z > 88
-%                     figure(14)
-%                     hold on
-%                     plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
-%                 end
-%             end
+            % 3. select most best line 
+            % (most confident or next one when length is more than 10% longer)
             
-            % 2. calculte best lines
             % top and bot start and end point in bb coordinates !!!
             [xy_bb_top, xy_bb_bot] = getTopBotLinesInBBwGravity(...
-                lines, y1, y3, x1, x2, depth_img, label, debug);
+                lines, x1, x2, y1, y3, debug);
             % left and right start and end point in bb coordinates !!!
             [xy_bb_left, xy_bb_right] = getLeftRightLinesInBBwGravity(...
-                lines, x1, x2, y1, y3, depth_img, label, debug);
+                lines, x1, x2, y1, y3, debug);
 
-            % 3. convert line to function of x coordinate
+            % 4. convert line to function of x coordinate
             [y_top, y_bot, x_left, x_right] = line2functionInBB(...
                 x1, x2, y1, y3, xy_bb_top, xy_bb_bot, xy_bb_left,xy_bb_right,  bb_width);
             
             % get intersections of edge function
             [xs1, ys1, xs2,ys2, xs3,ys3, xs4,ys4] = getIntersectionEdges(...
                 x1, x2, y_top, y_bot, x_left, x_right);
+            
+            %% rgb image
+            % plot edges in rgb image
+            if ploting == true
+                figure(2)
+                hold on
+                plot(x1:x2, y_top(x1:x2))
+                hold on
+                plot(x_right(y2:y3), y2:y3)
+                hold on
+                plot(x1:x2, y_bot(x1:x2))
+                hold on
+                plot(x_left(y2:y3), y2:y3)
+                hold on
+                % plot all coordinates in bounding box edge frame
+%                 plot(points_x, points_y,'.');
+%                 hold on
+                % plot intersection of edges in rgb
+                plot([xs1;xs2;xs3;xs4],[ys1;ys2;ys3;ys4], 'y+');
+                hold on
+            end
             
             % define frame width to take points for RANSAC
             if inside == true
@@ -209,27 +183,6 @@ for label = label_array
             else
                 disp(strcat('Not enough depth points at window: ', num2str(window)));
                 continue % with next window (for loop iteration)
-            end
-            
-            %% rgb image
-            % plot edges in rgb image
-            if ploting == true
-                figure(2)
-                hold on
-                plot(x1:x2, y_top(x1:x2))
-                hold on
-                plot(x_right(y2:y3), y2:y3)
-                hold on
-                plot(x1:x2, y_bot(x1:x2))
-                hold on
-                plot(x_left(y2:y3), y2:y3)
-                hold on
-                % plot all coordinates in bounding box edge frame
-%                 plot(points_x, points_y,'.');
-%                 hold on
-                % plot intersection of edges in rgb
-                plot([xs1;xs2;xs3;xs4],[ys1;ys2;ys3;ys4], 'y+');
-                hold on
             end
 
             %% 2. convert from image coordinates [px] to camera frame coordinates [mm]
