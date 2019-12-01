@@ -1,4 +1,4 @@
-function [y_top, y_bot, x_left, x_right] = line2functionInBB(x1, x2, y1, y3, xy_bb_top, xy_bb_bot, xy_bb_left,xy_bb_right,  bb_width)
+function [y_top, y_bot, x_left, x_right] = line2functionInBB(x1, x2, y1, y3, xy_bb_top, xy_bb_bot, xy_bb_left,xy_bb_right,  bb_width, inside)
 % return functions describing the frame along the selected edges
 % the frame has a bend if the edge goes out of the bb area because we want
 % the frame always to stays inside the bounding box
@@ -7,18 +7,30 @@ function [y_top, y_bot, x_left, x_right] = line2functionInBB(x1, x2, y1, y3, xy_
 %           bb_width:   width of frame along detected edges to take
 %                       measurements for RANSAC (previously used bounding
 %                       box and not detected edges, there the name comes from)
+%           inside:     boolean,  if true also bb_width/2 inside the edge frame
+%                                 if false only bb_width outside the edge frame
 %
 % output:   functions y=f(x) and x=f(y) defining the frame on which the
 %           window frame is presumed in !!! image coordinates !!!
 
-bb_width_half = (bb_width-1)/2;
+if inside == true
+    % we go half of the bb_width inside and half outside the edges
+    bb_width_half = (bb_width-1)/2;
+else
+    % we go the hole bb_with outside the edges
+    bb_width_half = bb_width;
+end
 
-if x1-bb_width_half > 1
+if x1-bb_width_half > 1 && x2+bb_width_half < 640
     x_ = x1-bb_width_half:x2+bb_width_half;
+elseif x1-bb_width_half > 1
+    x_ = x1-bb_width_half:640;
+elseif x2+bb_width_half < 640
+    x_ = 1:x2+bb_width_half;
 else
     x_ = x1:x2;
 end
-if y1-bb_width_half > 1
+if y1-bb_width_half > 1 && y3+bb_width_half < 480
     y_ = y1-bb_width_half:y3+bb_width_half;
 else
     y_ = y1:y3;
