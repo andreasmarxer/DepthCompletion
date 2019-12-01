@@ -1,4 +1,4 @@
-function adjDepth2PngImage(depth_img_adj, label, rotate_back)
+function adjDepth2PngImage(depth_img_adj, label, dataset, rotate_back)
 % save adjusted depth image as PNG image in path specified under filepath
 %
 % input:    depth_img_adj:  adjusted depth image in uint16 format
@@ -10,7 +10,7 @@ function adjDepth2PngImage(depth_img_adj, label, rotate_back)
 
 % make changes here -------------------------------------------------------
 type = 'depth_adj';
-filepath =  '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/temp/';
+filepath =  strcat('/home/andreas/Documents/ASL_window_dataset/', dataset,'/depth_images_adj/temp/');
 % -------------------------------------------------------------------------
 
 if rotate_back == true
