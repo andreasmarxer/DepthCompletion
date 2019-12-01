@@ -3,9 +3,9 @@ function [points_X_c, points_Y_c, points_Z_c] = pixelNormalView2camCoordinate(P_
 % input     u,v are pixel coordinates (origin top left), z is depth [mm]
 % output:   x,y,z in camera frame [mm] (origin at cx, cy see in intrinsics)
 
-points_x = P_all(:,1);
-points_y = P_all(:,2);
-points_z = P_all(:,3);
+points_x = single(P_all(:,1));
+points_y = single(P_all(:,2));
+points_z = single(P_all(:,3));
 
 % initialization
 points_Z_c = points_z;
