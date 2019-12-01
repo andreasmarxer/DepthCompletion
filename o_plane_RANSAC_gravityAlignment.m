@@ -42,6 +42,7 @@ for label = label_array
         tic;
         
         %% fix dependencies
+        dataset = 'original4'; % loads the correct pose file and saving imgs
         path = '/home/andreas/Documents/ASL_window_dataset/original4/';
         depth_filename = strcat(path, 'depth_images_mm/' ,'asl_window_', 'depth_', num2str(label), '.png');
         depth_filename_median = strcat(path, 'depth_images_median5/','asl_window_', 'depth_median5_', num2str(label), '.png');
@@ -101,7 +102,7 @@ for label = label_array
             lines = getLinesInBB(depth_img, x1, x2, y1, y3, bb_width, debug); %%%%%%% changed to rgb image
 
             % 2. calculate angle to gravity vector
-            lines = calculateLineAngle2Gravity(lines, x1, y1, depth_img, label, debug);
+            lines = calculateLineAngle2Gravity(lines, x1, y1, depth_img, label, dataset, debug);
             
             % 3. select most best line 
             % (most confident or next one when length is more than 10% longer)
@@ -337,7 +338,7 @@ for label = label_array
 
         %% save adjusted depth image as png
         if save == true            
-            adjDepth2PngImage(depth_img_adj, label, rotate_back)
+            adjDepth2PngImage(depth_img_adj, label, dataset, rotate_back)
             pause(0.2); % otherwise some images don't get saved
         end
         
