@@ -3,39 +3,31 @@ clear; clc; close all;
 %% parameters
 
 %%%%%%%%%%%%%%%%%%%
-ploting = true;
+ploting = false;
 rotate_back = true; % rotate the processed image before saving png
 % images need to have corrected upright  view due to prediction bouding box format
 debug = false;
 save = true;
-label = 220;
-% edge detector horizontal tunned with 366
-% working well % % % % % % % % 
-% 126, 131: one open door
-% 198:      one side door    
-% 303, 304: one dark door
-% 360:      two doors
-% 366:      one open door
-% 298 now also works
-% % % % % % % % % % % % % % % %
-% FAILS: 52, 302 due to prediction
+label = 0;
 %%%%%%%%%%%%%%%%%%%
 
 depth_procentual_th = 0.25; % [%] of depth measurements available
 inlier_th = 50; % [mm] distance to plane that is considered as inlier
 bb_width = 7; % must be odd number, width of frame around bb
-inside = true; % if true also bb_width/2 inside the bb area
+inside = false; % if true also bb_width/2 inside the edge frame
+                % if false only bb_width outside the edge frame
 
 confidence_th = 95; % [%] above which prediction confidence consider window
 
 area_th = 1/9; % procentage of area from bb that the triangle of chosen points must cover
 
-% labels which were used for training network, not adapted and considered !
-asl_train_labels = [1,16,39,90,128,178,199,221,264,269,283,289,307,337,...
-                    350,355,361,363,365,368];           
+% labels from original1 bag which were used for training network, not adapted and considered !
+% asl_train_labels = [1,16,39,90,128,178,199,221,264,269,283,289,307,337,...
+%                     350,355,361,363,365,368];          
+asl_train_labels = [0]; % when training with dataset not used for training
                 
 if label == 0
-    label_array = 1:1:372; 
+    label_array = 1:1:516; 
 else
     label_array = label;
 end
@@ -50,11 +42,11 @@ for label = label_array
         tic;
         
         %% fix dependencies
-        path = '/home/andreas/Documents/ASL_window_dataset/';
-        depth_filename = strcat(path, 'depth_images_mm/' ,'asl_window_', num2str(label), '_depth', '.png');
-        depth_filename_median = strcat(path, 'depth_images_median5/','asl_window_', num2str(label), '_depth_median5', '.png');
-        bb_filename = strcat(path, 'rgb_images_predictions/' ,'asl_window_', num2str(label), '_rgb', '.txt');
-        rgb_filename = strcat(path, 'rgb_images/' ,'asl_window_', num2str(label), '_rgb', '.jpg');
+        path = '/home/andreas/Documents/ASL_window_dataset/original4/';
+        depth_filename = strcat(path, 'depth_images_mm/' ,'asl_window_', 'depth_', num2str(label), '.png');
+        depth_filename_median = strcat(path, 'depth_images_median5/','asl_window_', 'depth_median5_', num2str(label), '.png');
+        bb_filename = strcat(path, 'rgb_images_predictions/' ,'asl_window_','rgb_', num2str(label), '.txt');
+        rgb_filename = strcat(path, 'rgb_images/' ,'asl_window_', 'rgb_', num2str(label), '.jpg');
         [class, confidence, left_x_vec, top_y_vec, width_vec, height_vec] = importBoundingBoxes(bb_filename);
         
         %% only consider windows with a confidence higher than the threshold
@@ -72,7 +64,7 @@ for label = label_array
         if ploting == true
             figure(1)
             visualize_depth_png(depth_img)  % millimeters
-            title(strcat('Depth Image corrected with nonzero median filter (k=5) - Frame : ', num2str(label)));
+            title(strcat('Depth Image median filtered (k=5) - Frame : ', num2str(label)));
             % plots predicted bounding box corner points
             plot_bb(left_x_vec,top_y_vec,width_vec,height_vec,depth_img);
             pause(0.2) % otherwise sometimes this isn't plotted
@@ -84,6 +76,7 @@ for label = label_array
         if ploting == true
             figure(2)
             imshow(rgb_filename)
+            title(strcat('RGB image - Frame : ', num2str(label)));
             % plots predicted bounding box corner points
             plot_bb(left_x_vec,top_y_vec,width_vec,height_vec,depth_img);
             pause(0.2) % otherwise sometimes this isn't plotted
@@ -104,7 +97,6 @@ for label = label_array
                 width_vec(window), height_vec(window), depth_img);
        
             %% edge detection
-
             % 1. returns line segments found in bounding box with Canny and Hough Transform
             lines = getLinesInBB(depth_img, x1, x2, y1, y3, bb_width, debug); %%%%%%% changed to rgb image
 
@@ -123,7 +115,7 @@ for label = label_array
 
             % 4. convert line to function of x coordinate
             [y_top, y_bot, x_left, x_right] = line2functionInBB(...
-                x1, x2, y1, y3, xy_bb_top, xy_bb_bot, xy_bb_left,xy_bb_right,  bb_width);
+                x1, x2, y1, y3, xy_bb_top, xy_bb_bot, xy_bb_left,xy_bb_right,  bb_width, inside);
             
             % get intersections of edge function
             [xs1, ys1, xs2,ys2, xs3,ys3, xs4,ys4] = getIntersectionEdges(...
@@ -192,6 +184,7 @@ for label = label_array
                             
             %% 3. make RANSAC in camera frame
             % RANSAC initialization
+            clear best_random3;
             best_inlier = 0; 
             best_param = [0; 0; 0]; 
             best_distance = 0;
@@ -326,7 +319,7 @@ for label = label_array
             pause(0.2) % otherwise sometimes this isn't plotted
             visualize_depth_png(depth_img_adj)
             pause(0.2) % otherwise sometimes this isn't plotted
-            title(strcat('Corrected depth image (k=5) with RANSAC plane fitted windows - Frame : ', num2str(label)));
+            title(strcat('Completed depth image - Frame : ', num2str(label)));
             % plots predicted bounding box corner points
             plot_bb(left_x_vec, top_y_vec, width_vec, height_vec, depth_img);
             pause(0.1) % otherwise sometimes this isn't plotted
