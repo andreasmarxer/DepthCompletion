@@ -103,7 +103,7 @@ for label = label_array
             %% edge detection
 
             % 1. returns line segments found in bounding box with Canny and Hough Transform
-            lines = getLines(depth_img, x1, x2, y1, y3, bb_width, debug);
+            lines = getLinesInBB(depth_img, x1, x2, y1, y3, bb_width, debug);
 
             % 2. calculte best lines
             % top and bot start and end point in bb coordinates !!!
