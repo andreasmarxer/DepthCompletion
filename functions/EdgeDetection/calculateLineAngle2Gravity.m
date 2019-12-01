@@ -1,7 +1,8 @@
-function lines = calculateLineAngle2Gravity(lines, x1, y1, depth_img, label, debug)
+function lines = calculateLineAngle2Gravity(lines, x1, y1, depth_img, label, dataset, debug)
 
 % load pose
-load('data/poses_lookedUp.mat'); % loaded as poses
+pose_filepath = strcat('data/poses_lookedUp_', dataset ,'.mat');
+load(pose_filepath); % loaded as poses
 % convert translation from [m] to [mm]
 poses(1:3,4,label) = poses(1:3,4,label)*1000;
 T_wc = poses(:,:,label);
@@ -37,14 +38,6 @@ for k = 1:length(lines)
     angle2zAxis = rad2deg(acos( (V_line'*V_z) / (norm(V_line))));
     lines(k).angle2z = angle2zAxis;
     
-    if debug == true
-        figure(1)
-        hold on
-        plot([lines(k).point1(1)+x1;lines(k).point2(1)+x1], [lines(k).point1(2)+y1;lines(k).point2(2)+y1],'LineWidth',2);
-        figure(2)
-        hold on
-        plot([lines(k).point1(1)+x1;lines(k).point2(1)+x1], [lines(k).point1(2)+y1;lines(k).point2(2)+y1],'LineWidth',2);
-    end
 end
 
 end
