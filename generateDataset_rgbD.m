@@ -1,4 +1,4 @@
-% ALL IN ALL - only use this script for getting ordered message HEADER time stamps
+ % ALL IN ALL - only use this script for getting ordered message HEADER time stamps
 % and the corresponding images
 
 clear; close all; clc;
@@ -11,8 +11,8 @@ bagInfo = rosbag('info',filename);
 %%
 % ==========  settings ===================
 rotation = true;
-print = true;
-save_img = true;
+print = false;
+save_img = false;
 save_mat = false;
 tolerance = 1e-3;
 % ========================================
@@ -23,7 +23,6 @@ topic_bag_1 = select(bag, 'Topic', topic_1);
 topic_2 = 'medium_resolution/depth_registered/image';
 type_2 = 'depth';
 topic_bag_2 = select(bag, 'Topic', topic_2);
-
 
 length_1 = topic_bag_1.NumMessages;
 length_2 = topic_bag_2.NumMessages;
@@ -50,7 +49,7 @@ end
 num_corr = size(idx_long,1);
 time_1 = zeros(num_corr, 1);
 time_2 = zeros(num_corr, 1);
-
+num_corr = 3;
 for label = 1:1:num_corr
     
     if topic_bag_1.NumMessages > topic_bag_2.NumMessages 
@@ -73,22 +72,23 @@ for label = 1:1:num_corr
 end
 
 
-%% Plots
-% Plot correspondant frames
-figure(1)
-scatter(1:size(idx_long_ext,1), idx_long_ext, 2,'filled')
-xlabel('rgb frames')
-ylabel('depth frames')
-title('Correspandance between rgb and depth camera message time stamps')
 
-% Plot time diff of correspondant ordered times
-figure(2)
-plot(diff(time_1))
-set(gca, 'YScale', 'log')
-xlabel('Corresponding frames')
-ylabel('Framerate of corresponding frames [s]')
-legend('mean 0.4664,  variance 0.7750')
-title('Time synchronisation of RGB-D setup')
+% %% Plots
+% % Plot correspondant frames
+% figure(1)
+% scatter(1:size(idx_long_ext,1), idx_long_ext, 2,'filled')
+% xlabel('rgb frames')
+% ylabel('depth frames')
+% title('Correspandance between rgb and depth camera message time stamps')
+% 
+% % Plot time diff of correspondant ordered times
+% figure(2)
+% plot(diff(time_1))
+% set(gca, 'YScale', 'log')
+% xlabel('Corresponding frames')
+% ylabel('Framerate of corresponding frames [s]')
+% legend('mean 0.4664,  variance 0.7750')
+% title('Time synchronisation of RGB-D setup')
 
 
 %% functions
