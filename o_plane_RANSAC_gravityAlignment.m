@@ -3,11 +3,12 @@ clear; clc; close all;
 %% parameters
 
 %%%%%%%%%%%%%%%%%%%
-ploting = false;
+ploting = true;
 rotate_back = true; % rotate the processed image before saving png
 % images need to have corrected upright  view due to prediction bouding box format
 debug = false;
 save = true;
+save_figures = true;
 label = 0;
 %%%%%%%%%%%%%%%%%%%
 
@@ -27,7 +28,7 @@ area_th = 1/9; % procentage of area from bb that the triangle of chosen points m
 asl_train_labels = [0]; % when training with dataset not used for training
                 
 if label == 0
-    label_array = 1:1:516; 
+    label_array = 2:1:516; 
 else
     label_array = label;
 end
@@ -42,8 +43,8 @@ for label = label_array
         tic;
         
         %% fix dependencies
-        dataset = 'original4'; % loads the correct pose file and saving imgs
-        path = '/home/andreas/Documents/ASL_window_dataset/original4/';
+        dataset = 'original5'; % loads the correct pose file and saving imgs
+        path = '/home/andreas/Documents/ASL_window_dataset/original5/';
         depth_filename = strcat(path, 'depth_images_mm/' ,'asl_window_', 'depth_', num2str(label), '.png');
         depth_filename_median = strcat(path, 'depth_images_median5/','asl_window_', 'depth_median5_', num2str(label), '.png');
         bb_filename = strcat(path, 'rgb_images_predictions/' ,'asl_window_','rgb_', num2str(label), '.txt');
@@ -267,7 +268,10 @@ for label = label_array
 
             disp(strcat('Window: ', num2str(window), ' Best inlier ratio: ', num2str(best_inlier/size(points_z,1)), ' Best std: ', num2str(best_std)));
             disp(strcat('Iterations skipped : ', num2str(ransac_it_skipped)));
-
+            
+            % camera intrinsic with shifted principal point due to rotated image
+            load('data/K_normalView.mat'); % loaded as K_normalView
+            
             % adjust depth image for each pixel inside bounding box
             for x = x1:1:x2
                 for y = y1:1:y3
@@ -275,7 +279,7 @@ for label = label_array
                     if y_top(x)<=y && y_bot(x)>=y && x_left(y)<=x && x_right(y)>=x
                         
                         % convert x,y [px] to normalized image coordinates x,y [m] (z=1m)
-                        [X_norm, Y_norm] = pixelNormalView2normImgCoordinates(x, y);
+                        [X_norm, Y_norm] = pixelNormalView2normImgCoordinates(x, y, K_normalView);
 
                         % calculate new Z value
                         % n*[x_n; y_n; 1] = [X_c; Y_c; Z_c] 
@@ -337,6 +341,14 @@ for label = label_array
         end
 
         %% save adjusted depth image as png
+        if save_figures == true
+            figure(1)
+            saveas(gcf,strcat('figures/', dataset, '_depth_', num2str(label), '.png'))
+            figure(2)
+            saveas(gcf,strcat('figures/', dataset, '_rgb_', num2str(label), '.png'))
+            figure(3)
+            saveas(gcf,strcat('figures/', dataset, '_depth_completed_', num2str(label), '.png'))
+        end
         if save == true            
             adjDepth2PngImage(depth_img_adj, label, dataset, rotate_back)
             pause(0.2); % otherwise some images don't get saved
