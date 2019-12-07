@@ -37,14 +37,14 @@ else
 end
     
 for x = x_
-    if xy_bb_top ~= 0
+    if all(all(~isnan(xy_bb_top)))
         % calculate y coordinate from line function as y=f(x)
         y_top(x) = getYLineCoordinateInBB(x, xy_bb_top, y1, y3, x1);
     else
         % take bounding box limit
         y_top(x) = y1;
     end
-    if xy_bb_bot ~= 0
+    if all(all(~isnan(xy_bb_bot)))
         % calculate y coordinate from line function as y=f(x)
         y_bot(x) = getYLineCoordinateInBB(x, xy_bb_bot, y1, y3, x1);
     else
@@ -54,14 +54,14 @@ for x = x_
 end
 
 for y = y_
-    if size(xy_bb_left,1) ~= 1 && ~(xy_bb_left(1,1)==xy_bb_left(2,1)) %2nd criterion is due to singularity of function y=f(x) can't map x=2
+    if all(all(~isnan(xy_bb_left))) && ~(xy_bb_left(1,1)==xy_bb_left(2,1)) %2nd criterion is due to singularity of function y=f(x) can't map x=2
         % calculate x coordinate from line function as x=f(y)
         x_left(y) = getXLineCoordinateInBB(y, xy_bb_left, x1, x2, y1);
     else
         % take bounding box limit
         x_left(y) = x1;
     end
-    if size(xy_bb_right,1) ~= 1 && ~(xy_bb_right(1,1)==xy_bb_right(2,1))
+    if all(all(~isnan(xy_bb_right))) && ~(xy_bb_right(1,1)==xy_bb_right(2,1))
         % calculate x coordinate from line function as x=f(y)
         x_right(y) = getXLineCoordinateInBB(y, xy_bb_right, x1, x2, y1);
     else
