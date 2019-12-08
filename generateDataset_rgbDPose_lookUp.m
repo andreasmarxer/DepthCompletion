@@ -232,8 +232,7 @@ function log_save_pose_lookedup(label, tf, filename)
 fid = fopen(filename,'a');
 fprintf( fid, '%d\t%d\t%d\n', label-1, label-1, label );
 
-invert = false;
-m = return_pose_tfStamped_msg(tf, invert);
+m = return_pose_tfStamped_msg(tf);
 fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(1,1), m(1,2), m(1,3), m(1,4) );
 fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(2,1), m(2,2), m(2,3), m(2,4) );
 fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(3,1), m(3,2), m(3,3), m(3,4) );
@@ -243,7 +242,7 @@ fclose(fid);
 end
 
 
-function pose = return_pose_tfStamped_msg(tf, invert)
+function pose = return_pose_tfStamped_msg(tf)
 % transform tf pose format (quaternion) to transformation matrix
 % input:    transformation (tf)
 %           invert: boolean, for inverting the pose world -> cam
@@ -255,10 +254,8 @@ q_y = tf.Transform.Rotation.Y;
 q_z = tf.Transform.Rotation.Z;
 q_w = tf.Transform.Rotation.W;
 quat = [q_w, q_x, q_y, q_z];
-R_cw = quat2rotm(quat); % quaternion to rotation matrix
-if invert == true
-    R_wc = R_cw';
-end
+R_wc = quat2rotm(quat); % quaternion to rotation matrix
+
 
 % translation
 t_x = tf.Transform.Translation.X;
@@ -266,12 +263,8 @@ t_y = tf.Transform.Translation.Y;
 t_z = tf.Transform.Translation.Z;
 t_1 = 1;
 
-t_cw = [t_x; t_y; t_z];
-T_cw = [t_cw; 1];
-if invert == true
-    t_wc = -R_wc*t_cw;
-    T_wc = [t_wc; 1];
-end
+t_wc = [t_x; t_y; t_z];
+T_wc = [t_wc; 1];
 
 % initialize pose
 pose = zeros(4,4);
