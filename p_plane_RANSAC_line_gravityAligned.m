@@ -259,6 +259,7 @@ for label = label_array
                 points_x = [points_x_c_1; points_x_c_2];
                 points_y = [points_y_c_1; points_y_c_2];
                 points_z = [points_z_c_1; points_z_c_2];
+                %param = pts2plane([points_x, points_y, points_z]);
                 param = [points_x, points_y, ones(size(points_x,1),1)] \ [points_z];
                 
                 % calculate distance
