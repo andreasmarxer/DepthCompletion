@@ -3,7 +3,7 @@
 
 clear; close all; clc;
 
-filename = '/home/andreas/Documents/ros_recording/2019-10-15-17-48-49.bag';
+filename = '/media/andreas/SanDiskSSD/Semester_Thesis/ros_recording/2019-10-15-17-48-49_original.bag';
 bag = rosbag(filename);
 bagInfo = rosbag('info',filename);
 
@@ -11,8 +11,8 @@ bagInfo = rosbag('info',filename);
 %%
 % ==========  settings ===================
 rotation = true;
-print = false;
-save_img = false;
+print = true;
+save_img = true;
 save_mat = false;
 tolerance = 1e-3;
 % ========================================
