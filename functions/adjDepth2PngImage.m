@@ -10,7 +10,8 @@ function adjDepth2PngImage(depth_img_adj, label, dataset, rotate_back)
 
 % make changes here -------------------------------------------------------
 type = 'depth_adj';
-filepath =  strcat('/home/andreas/Documents/ASL_window_dataset/', dataset,'/depth_images_adj/temp/');
+%filepath =  strcat('/home/andreas/Documents/ASL_window_dataset/', dataset,'/depth_images_adj/temp/');
+filepath =  strcat('/home/andreas/Documents/DepthAdaptation/temp/');
 % -------------------------------------------------------------------------
 
 if rotate_back == true
