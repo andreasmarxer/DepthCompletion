@@ -10,13 +10,13 @@ function [x1, y1, x2, y2, x3, y3, x4, y4 ] = plot_bb(left_x_vec, top_y_vec, widt
         [x1, y1, x2, y2, x3, y3, x4, y4 ] = convertToBBCoords(left_x_vec(window), top_y_vec(window), width_vec(window), height_vec(window), img);
 
         hold on
-        plot(x1, y1, 'rx')
+        plot(x1, y1, 'rx', 'LineWidth', 2)
         hold on
-        plot(x2, y2, 'gx')
+        plot(x2, y2, 'gx', 'LineWidth', 2)
         hold on
-        plot(x3, y3, 'cx')
+        plot(x3, y3, 'cx', 'LineWidth', 2)
         hold on
-        plot(x4, y4, 'wx')
+        plot(x4, y4, 'wx', 'LineWidth', 2)
         hold off
     end
     
