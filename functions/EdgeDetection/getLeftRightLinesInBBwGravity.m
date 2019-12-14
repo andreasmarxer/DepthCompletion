@@ -13,8 +13,8 @@ function [xy_bb_left, xy_bb_right] = getLeftRightLinesInBBwGravity(lines, x1, x2
 % initialization
 max_len_left = 0;
 max_len_right = 0;
-xy_bb_left = 0;
-xy_bb_right = 0;
+xy_bb_left = nan(2,2);
+xy_bb_right = nan(2,2);
 
 % define borders for points of left and right lines to lie in
 x_bb_2_3_left = floor(2*(x2-x1)/3); % pixel value at 2/3 of width
@@ -26,6 +26,13 @@ for k = 1:length(lines)
     % vertical line
     if lines(k).angle2z < 4
         
+        if debug == true
+                    figure(11)
+                    hold on
+                    plot([lines(k).point1(1)+x1;lines(k).point2(1)+x1], [lines(k).point1(2)+y1;lines(k).point2(2)+y1],'LineWidth',2);
+                    title('All vertical lines');
+        end
+        
         %line_left if start and end point is in left 2/3 of bounding box
         if lines(k).point1(1) < x_bb_2_3_left && lines(k).point2(1) < x_bb_2_3_left
             len = norm(lines(k).point1 - lines(k).point2);
@@ -35,9 +42,11 @@ for k = 1:length(lines)
                 xy_bb_left = [lines(k).point1; lines(k).point2];
                 % Debugging
                 if debug == true
-                    figure(11)
+                    figure(13)
                     hold on
-                    plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+                    plot([lines(k).point1(1)+x1;lines(k).point2(1)+x1], [lines(k).point1(2)+y1;lines(k).point2(2)+y1],'LineWidth',2);
+                    title('All vertical lines selected');
+                    pause(0.2)
                 end
             end
         %line_right if start and end point is in right 2/3 of bounding box
@@ -49,9 +58,10 @@ for k = 1:length(lines)
                 xy_bb_right = [lines(k).point1; lines(k).point2];
                 % Debugging
                 if debug == true
-                    figure(11);
+                    figure(13);
                     hold on
-                    plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
+                    plot([lines(k).point1(1)+x1;lines(k).point2(1)+x1], [lines(k).point1(2)+y1;lines(k).point2(2)+y1],'LineWidth',2);
+                    title('All vertical lines selected');
                     pause(0.2)
                 end
             end
