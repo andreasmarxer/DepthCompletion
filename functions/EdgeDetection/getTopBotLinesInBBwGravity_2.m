@@ -27,7 +27,6 @@ for k = 1:length(lines)
         % line_top if start and end point is in top 1/2 of bounding box
         if lines(k).point1(2) < y_bb_1_3_top && lines(k).point2(2) < y_bb_1_3_top
             len = norm(lines(k).point1 - lines(k).point2);
-            len_x = abs(lines(k).point1(1)-lines(k).point2(1));
             if (len > 1.1*max_len_top) && (len > round(1/3*(x2-x1)))
                 max_len_top = len;
                 % endpoint of longest top line
@@ -43,7 +42,6 @@ for k = 1:length(lines)
         % line_bottom if start and end point is in bottom 1/2 of bounding box
         elseif lines(k).point1(2) > y_bb_2_3_bot && lines(k).point2(2) > y_bb_2_3_bot
             len = norm(lines(k).point1 - lines(k).point2);
-            len_x = abs(lines(k).point1(1)-lines(k).point2(1));
             if (len > 1.1*max_len_bot) && (len > round(1/3*(x2-x1)))
                 max_len_bot = len;
                 % endpoint of longest bot line
