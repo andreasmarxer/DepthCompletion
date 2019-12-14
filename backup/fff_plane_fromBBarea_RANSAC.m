@@ -2,9 +2,8 @@ clear; clc; close all;
 %%=========================================================================
 %% parameters
 tic;
-% 370, 2, 10, 377
-% 100 very good with XX params
-label =165;  %196
+
+label = 126;
 
 % correcting rastered data
 kernel = 5;
