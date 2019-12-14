@@ -12,7 +12,6 @@ function lines = getLines(depth_img_woraster, x1, x2, y1, y3, bb_width, debug)
 %
 % output:   lines:      struct array with fields: point1, point2, theta, rho
 
-bb_width_half = (bb_width-1)/2;
 % extract bounding box area
 depth_img_woraster_BB = depth_img_woraster(y1:y3, x1:x2);
 % canny edge detection
@@ -30,29 +29,13 @@ Peaks  = houghpeaks(Hough, num_peaks, 'threshold', ceil(0.2*max(Hough(:)))); % p
 %Peaks2  = houghpeaks(Hough2, num_peaks, 'threshold', ceil(0.5*max(Hough2(:)))); % peak
 
 % 3. find lines
+%fill_gap_th = round(1/20*(x2-x1)+5);
+%fill_gap_th = 5;
+
 a = 0.04;
 b = 6;
-fill_gap_th = round(a*(x2-x1)+b);
+fill_gap_th = round(a*(x2-x1)+b); 
 min_lenght_th = round(1/4*(x2-x1));
 lines = houghlines(BW, Theta, Rho, Peaks, 'FillGap', fill_gap_th, 'MinLength', min_lenght_th);
 
-if debug == true
-    figure(9)
-    imshow(BW)
-    pause(0.2)
-    hold on
-    for k = 1:length(lines)
-%         disp(num2str(depth_img_woraster(lines(k).point1(2), lines(k).point1(1))));
-%         disp(num2str(depth_img_woraster(lines(k).point2(2), lines(k).point2(1))));
-        plot([lines(k).point1(1);lines(k).point2(1)], [lines(k).point1(2);lines(k).point2(2)],'LineWidth',2);
-    end
-    figure(10)
-    imshow(BW)
-    pause(0.2)
-    figure(11)
-    imshow(BW)
-    pause(0.2)
-    figure(12)
-    imshow(BW)
-    pause(0.2)
 end
