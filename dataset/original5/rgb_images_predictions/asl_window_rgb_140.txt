@@ -1,0 +1,1 @@
+window, 100, left_x,  278, top_y,  140,width,   76, height,  331
