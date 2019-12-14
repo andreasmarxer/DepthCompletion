@@ -41,7 +41,7 @@ for frame = 1:1:length_1
     % (tf msg has a bit different structure than image messages)
     topic_frame_msg_cell_1 = readMessages(topic_bag_1, frame); % take image message of frames of bag
     topic_frame_msg_1 = topic_frame_msg_cell_1{1}; % extract from cell
-    if topic_frame_msg_1.Transforms.tf2_TFmessag.FrameId == "mission"
+    if topic_frame_msg_1.Transforms.Header.FrameId == "mission"
         msg_time_1 = return_msg_time_tf2_msg(topic_frame_msg_1);
         msg_time_vec_1(frame) = msg_time_1;
     end
