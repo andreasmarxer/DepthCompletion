@@ -1,17 +1,19 @@
 clear; close all; clc;
 
-filename = '/media/andreas/SanDiskSSD/Semester_Thesis/ros_recording/2019-10-15-17-48-49_original.bag';
+filename = '/media/andreas/SanDiskSSD/Semester_Thesis/ros_recording/original5_maplab_optimized_2019-11-28-13-18-04.bag';
 bag = rosbag(filename);
 bagInfo = rosbag('info',filename);
 
 %%
 % ==============================  settings ================================
-rotation = false;   % need to be false for matching with pose
+rotation = true;    % need to be false for directly using for Open3d and matching with pose
+                    % need to be true for generating images for depth adaptation
+raster_correction = true; % median filter the depth image
+kernel = 5;         % kernel size for median filter
 print = false;      % print images as figures
-save_img = true;   % save images (depth png, rgb jpeg)
+save_img = false;   % save images (depth png, rgb jpeg)
 save_mat = false;   % save image additionaly as array
-save_pose = true;   % save pose in file.txt (for Open3D rename to .log)
-debug = true;       % print msgs for debugging
+debug = false;       % print msgs for debugging
 tolerance_depth_rgb = 1/1000; %1ms tol in header time for correspondances
 % =========================================================================
 
@@ -41,15 +43,20 @@ end
 
 %% calculate correspondance indexes of header times between depth and rgb
 
-[idx_rgb_depth, idx_depth_rgb] = return_idx(msg_time_vec_rgb, msg_time_vec_depth, tolerance_depth_rgb);
+if length_rgb > length_depth
+    [idx_rgb_depth, idx_depth_rgb] = return_idx(msg_time_vec_rgb, msg_time_vec_depth, tolerance_depth_rgb);
+else
+    [idx_depth_rgb, idx_rgb_depth] = return_idx(msg_time_vec_rgb, msg_time_vec_depth, tolerance_depth_rgb);
+end
+
 num_corr = size(idx_rgb_depth,1);
     
 %% debugging
 
 if debug == true
     for i = 1:num_corr
-          diff = msg_time_vec_rgb(idx_rgb_depth(i))-msg_time_vec_depth(idx_depth_rgb(i));
-          test(i) = diff > tolerance_depth_rgb;
+        diff = msg_time_vec_rgb(idx_rgb_depth(i))-msg_time_vec_depth(idx_depth_rgb(i));
+        test(i) = diff > tolerance_depth_rgb;
     end
 nnz(test) % if 0 it worked correct
 end
@@ -61,10 +68,12 @@ date_str = date;
 temp = clock;
 time_str = strcat('-', num2str(temp(4)), 'h-', num2str(temp(5)));
 filename = strcat(date_str, time_str, 'rgbdPose_open3D');
-    
+% pose array
+poses = zeros(4,4,num_corr);
+
 % save RGB, DEPTH and look up and save POSE for correspondante depth time
-for label = 1:num_corr
-    label_write = label;
+for label = 2:num_corr
+    label_write = label-1;
     
     if debug == true
         disp(label)
@@ -72,12 +81,15 @@ for label = 1:num_corr
     end
     
     % rgb part
-    plot_save_img(topic_bag_rgb, idx_rgb_depth(label), type_rgb, label_write, rotation, print, save_img, save_mat, 'jpg');
+    plot_save_img(topic_bag_rgb, idx_rgb_depth(label), label_write, type_rgb, rotation, print, save_img, save_mat, 'jpg', raster_correction, kernel);
     % depth part
-    plot_save_img(topic_bag_depth, idx_depth_rgb(label), type_depth, label_write, rotation, print, save_img, save_mat, 'png');
+    plot_save_img(topic_bag_depth, idx_depth_rgb(label), label_write, type_depth, rotation, print, save_img, save_mat, 'png', raster_correction, kernel);
     % pose lookup for calculated times (only available in bag until frame 372!)
-    tf = getTransform(bag, 'mission', 'camera0', msg_time_vec_depth(idx_depth_rgb(label)));
+    tf = getTransform(bag, 'mission', 'camera0', msg_time_vec_depth(idx_depth_rgb(label))); % T_mission_camera0
+    % save text file for Open3D
     log_save_pose_lookedup(label, tf, filename)
+    % save matlab array for gravity alignment
+    poses(:,:,label) = return_pose_tfStamped_msg(tf);
 end
 
 
@@ -163,7 +175,7 @@ return
 end
 
 
-function plot_save_img(topic_bag, frame, label, type, rotation, print, save_img, save_mat, img_format)
+function plot_save_img(topic_bag, frame, label, type, rotation, print, save_img, save_mat, img_format, raster_correction, kernel)
 % plots and saves img according to specifications defined in input
 % input:    topic_bag:  topic of bag
 %           frame:      message number in topic
@@ -174,15 +186,35 @@ function plot_save_img(topic_bag, frame, label, type, rotation, print, save_img,
 %           save_img:   boolean, save image in img_format
 %           save_mat:   boolean, save image as array
 %           img_format: 'jpg' for rgb, 'png' for depth
+%           raster_correction:  boolean, if true median filter is applied on depth
+%           kernel:     kernel size for raster correction
 % output:   index of time vectors which correspond considering tolerance
+
+if nargin < 9
+        img_format = 'jpg';
+        raster_correction = false;
+end
 
 topic_frame_msg_cell = readMessages(topic_bag, frame); % take image message of frames of bag
 topic_frame_msg = topic_frame_msg_cell{1}; % extract from cell
 % convert ros image format to array
 img = readImage(topic_frame_msg);
-
+    
 if rotation == true
     img = imrotate(img, 180);
+end
+
+if raster_correction == true && type(1) == 'd'
+    kernel_half = (kernel-1)/2;
+    depth_img_woraster = img;
+    for x = kernel_half+1:1:size(img,2)-kernel_half
+        for y = kernel_half+1:1:size(img,1)-kernel_half
+            % only apply filter if value is not available !!!
+            if ~(depth_img_woraster(y,x) > 0)
+                depth_img_woraster(y,x) = kernelMedian(kernel,x,y,img);
+            end
+        end
+    end
 end
 
 if print == true
@@ -191,23 +223,31 @@ if print == true
 end
 
 if save_img == true
-    if nargin < 9
-        img_format = 'jpg';
-    end
     % rgb images
-    if img_format == 'jpg'
+    if all(img_format == 'jpg')
         filename = strcat('asl_window_', num2str(type), '_', num2str(label), '.jpg');
         imwrite(img, filename);
     % depth images
-    elseif img_format == 'png'
-        filename = strcat('asl_window_', num2str(type), '_', num2str(label), '.png');
+    elseif all(img_format == 'png')
+        filename_depth = strcat('asl_window_', num2str(type), '_', num2str(label), '.png');
         % convert Nans to zeros
         img(isnan(img))=0;
         % convert from m to mm
-        img = img * 1000;  
+        img = img * 1000;
         % convert to uint16
-        img_uint16 = uint16(img);
-        imwrite(img_uint16, filename, 'fmt', 'png');
+        img = uint16(img);
+        imwrite(img, filename_depth, 'fmt', 'png'); 
+        
+        if raster_correction == true 
+            filename_depth_median = strcat('asl_window_', num2str(type), '_median', num2str(kernel), '_', num2str(label), '.png');
+            % convert Nans to zeros
+            depth_img_woraster(isnan(img))=0;
+            % convert from m to mm
+            depth_img_woraster = depth_img_woraster * 1000;
+            % convert to uint16
+            depth_img_woraster = uint16(depth_img_woraster);
+            imwrite(depth_img_woraster, filename_depth_median, 'fmt', 'png');
+        end
     end
 end % of save_img
 
@@ -232,7 +272,8 @@ function log_save_pose_lookedup(label, tf, filename)
 fid = fopen(filename,'a');
 fprintf( fid, '%d\t%d\t%d\n', label-1, label-1, label );
 
-m = return_pose_tfStamped_msg(tf);
+invert = false;
+m = return_pose_tfStamped_msg(tf, invert);
 fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(1,1), m(1,2), m(1,3), m(1,4) );
 fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(2,1), m(2,2), m(2,3), m(2,4) );
 fprintf( fid, '%.10f\t%.10f\t%.10f\t%.10f\n', m(3,1), m(3,2), m(3,3), m(3,4) );
@@ -254,8 +295,7 @@ q_y = tf.Transform.Rotation.Y;
 q_z = tf.Transform.Rotation.Z;
 q_w = tf.Transform.Rotation.W;
 quat = [q_w, q_x, q_y, q_z];
-R_wc = quat2rotm(quat); % quaternion to rotation matrix
-
+R_cw = quat2rotm(quat); % quaternion to rotation matrix
 
 % translation
 t_x = tf.Transform.Translation.X;
@@ -263,19 +303,16 @@ t_y = tf.Transform.Translation.Y;
 t_z = tf.Transform.Translation.Z;
 t_1 = 1;
 
-t_wc = [t_x; t_y; t_z];
-T_wc = [t_wc; 1];
+t_cw = [t_x; t_y; t_z];
+T_cw = [t_cw; 1];
 
 % initialize pose
 pose = zeros(4,4);
+
 % output
-if invert == true
-    pose(1:3,1:3) = R_wc;
-    pose(1:4,4) = T_wc;
-else
-    pose(1:3,1:3) = R_cw;
-    pose(1:4,4) = T_cw;
-end
+pose(1:3,1:3) = R_cw;
+pose(1:4,4) = T_cw;
+
 
 return
     
