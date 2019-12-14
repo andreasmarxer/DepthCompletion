@@ -2,7 +2,7 @@ clear; clc;
 rosshutdown;
 
 % set print statements on/off with debug mode
-debug = true;
+debug = false;
 
 
 try
@@ -59,7 +59,7 @@ function sensor_msgsImageCallback(~, msg_in)
     end
     
     % get time vector of all correspondant images
-    time_corresp = getGlobalTimeCorresp;
+    %time_corresp = getGlobalTimeCorresp;
     % get struct with bouding boxes
     struct_bb_pred = getGlobalBoundingBoxes;
     
@@ -105,7 +105,7 @@ function sensor_msgsImageCallback(~, msg_in)
             %% get adjusted depth image and process for writting to message
             rotation_back = true;
 
-            path = '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/';
+            path = '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/e/'; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             filename = strcat(path, 'asl_window_', num2str(label), '_depth_adj.png');
 
             img = imread(filename); % PNG image: uint16, [mm]
@@ -219,9 +219,9 @@ end
 function setGlobalTimeCorresp
     global a
     % ONLY change this 1 line here !!! -----------------------------------
-    time_struct = load('/home/andreas/Documents/MATLAB/time_corresp.mat');
+    time_struct = load('/home/andreas/Documents/DepthAdaptation/data/msg_time_vec_depth_corr.mat');  %%%%%%%%%%%
     % ONLY change this 1 line here !!! -----------------------------------
-    a = time_struct.time_corresp;
+    a = time_struct.msg_time_vec_depth_corr;  %%%%%%%%%%%%%%%%%%
 end
 
 function time_vec = getGlobalTimeCorresp

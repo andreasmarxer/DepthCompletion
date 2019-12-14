@@ -2,7 +2,8 @@ clear; clc;
 rosshutdown;
 
 % set print statements on/off with debug mode
-debug = true;
+debug = false;
+setDebug(debug);
 
 try
    %% initialization
@@ -38,7 +39,7 @@ try
     pause(1);
 
     % load global variable time correspondance vector
-    setGlobalTimeCorresp;
+    %setGlobalTimeCorresp;
     % load global struct with bouding box predictions
     setGlobalBoundingBoxes;
     
@@ -63,7 +64,7 @@ function sensor_msgsImageCallback(~, msg_in)
     end
     
     % get time vector of all correspondant images
-    time_corresp = getGlobalTimeCorresp;
+    %time_corresp = getGlobalTimeCorresp;
     % get struct with bouding boxes
     struct_bb_pred = getGlobalBoundingBoxes;
     
@@ -80,7 +81,7 @@ function sensor_msgsImageCallback(~, msg_in)
 
         if ismember(label, asl_train_labels)
             if getDebug
-                disp('-- Training image, return! ');
+                ('-- Training image, return! ');
             end
             return;
         else
@@ -109,9 +110,10 @@ function sensor_msgsImageCallback(~, msg_in)
             %% get adjusted depth image and process for writting to message
             rotation_back = true;
 
-            path = '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/';
-            filename = strcat(path, 'asl_window_', num2str(label), '_depth_adj.png');
-
+            path = '/home/andreas/Documents/ASL_window_dataset/depth_images_adj/e/'; %%%%%%%%%%%%%%%%%%%%%
+            %filename = strcat(path, 'asl_window_', num2str(label), '_depth_adj.png');
+            filename = strcat(path, 'asl_window_', num2str(label), '_depth.png');
+            
             img = imread(filename); % PNG image: uint16, [mm]
             img = single(img); % backtransform to single
             img(img < 0.0001) = NaN; % backtransform zeros to NaN
@@ -131,7 +133,7 @@ function sensor_msgsImageCallback(~, msg_in)
             % get global publisher
             pub_global_predictions = getGlobalPubBoundingBoxes;
         
-            %disp(num2str(struct_bb_pred(label).x1));
+            %disp(num2str((label).x1));
             num_pred = size(struct_bb_pred(label).x1,1);
             
             for window = 1:num_pred
@@ -185,7 +187,9 @@ end
 
 
 function tf2_msgsPoseCallback(~, msg_in)
-disp("RECEIVED tf2_msgs/TFMessage message, Doing Callback !");
+if getDebug
+    disp("RECEIVED tf2_msgs/TFMessage message, Doing Callback !");
+end
 
     % 1. check if it's a tf or tf static message
     % -> tf static have 2 transforms inside, tf only one
@@ -261,27 +265,27 @@ end
 
 %% global timevector of correspondant times
 
-function setGlobalTimeCorresp
-    global a
-    % ONLY change this 1 line here !!! -----------------------------------
-    time_struct = load('/home/andreas/Documents/MATLAB/time_corresp.mat');
-    % ONLY change this 1 line here !!! -----------------------------------
-    a = time_struct.time_corresp;
-end
-
-function time_vec = getGlobalTimeCorresp
-    global a
-    time_vec = a;
-end
+% function setGlobalTimeCorresp
+%     global a
+%     % ONLY change this 1 line here !!! -----------------------------------
+%     time_struct = load('/home/andreas/Documents/DepthAdaptation/struct_depth_all_woPred.mat');
+%     % ONLY change this 1 line here !!! -----------------------------------
+%     a = time_struct.time_corresp;
+% end
+% 
+% function time_vec = getGlobalTimeCorresp
+%     global a
+%     time_vec = a;
+% end
 
 
 %% global vector with bouding box coordinates
 function setGlobalBoundingBoxes
     global b
     % ONLY change this 1 line here !!! -----------------------------------
-    bb_struct = load('/home/andreas/Documents/MATLAB/struct_bb_pred.mat');
+    bb_struct = load('/home/andreas/Documents/DepthAdaptation/struct_depth_all_woPred.mat');  %%%%%%%%%%%%%%%%%%
     % ONLY change this 1 line here !!! -----------------------------------
-    b = bb_struct.struct_bb_pred;
+    b = bb_struct.struct; %% adapt here if only part of dataset
 end
 
 function bb = getGlobalBoundingBoxes
