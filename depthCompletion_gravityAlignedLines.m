@@ -9,12 +9,12 @@ rotate_back = true; % rotate the processed image before saving png
 debug = false;
 save = true;
 save_figures = false;
-label = 110;
+label = 130;
 %%%%%%%%%%%%%%%%%%%
 
 confidence_th = 95; % [%] above which prediction confidence consider window
 dist_th = 50;
-% not used anymore !!!
+% not used in actual approach but still needed as input in functions
 bb_width = 7;
 inside = false;
 
@@ -32,7 +32,7 @@ for label = label_array
 
     %% fix dependencies
     dataset = 'original5'; % loads the correct pose file and saving imgs
-    path = '/home/andreas/Documents/ASL_window_dataset/original5/';
+    path = 'dataset/original5/';
     depth_filename = strcat(path, 'depth_images_mm/' ,'asl_window_', 'depth_', num2str(label), '.png');
     depth_filename_median = strcat(path, 'depth_images_median5/','asl_window_', 'depth_median5_', num2str(label), '.png');
     bb_filename = strcat(path, 'rgb_images_predictions/' ,'asl_window_','rgb_', num2str(label), '.txt');
