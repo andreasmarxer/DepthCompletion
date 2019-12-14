@@ -29,7 +29,7 @@ for k = 1:length(lines)
         %line_left if start and end point is in left 2/3 of bounding box
         if lines(k).point1(1) < x_bb_2_3_left && lines(k).point2(1) < x_bb_2_3_left
             len = norm(lines(k).point1 - lines(k).point2);
-            if (len > 1.1*max_len_left) && (len > round(1/3*(y3-y1)))
+            if (len > 1.1*max_len_left) %&& (len > round(1/3*(y3-y1)))
                 max_len_left = len;
                 % endpoint of longest top line
                 xy_bb_left = [lines(k).point1; lines(k).point2];
@@ -44,7 +44,7 @@ for k = 1:length(lines)
         %line_right if start and end point is in right 2/3 of bounding box
         elseif lines(k).point1(1) > x_bb_1_3_right && lines(k).point2(1) > x_bb_1_3_right
             len = norm(lines(k).point1 - lines(k).point2);
-            if (len > 1.1*max_len_right) && (len > round(1/3*(y3-y1)))
+            if (len > 1.1*max_len_right) %&& (len > round(1/3*(y3-y1)))
                 max_len_right = len;
                 % endpoint of longest bot line
                 xy_bb_right = [lines(k).point1; lines(k).point2];
