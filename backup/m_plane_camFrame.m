@@ -5,7 +5,7 @@ clear; clc; close all;
 %%%%%%%%%%%%%%%%%%%
 ploting = true;
 save = false;
-label = 366;  %52 fails
+label = 218;
 %%%%%%%%%%%%%%%%%%%
 
 % correcting rastered data
