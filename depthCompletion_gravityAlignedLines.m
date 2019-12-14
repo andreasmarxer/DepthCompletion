@@ -432,58 +432,7 @@ for label = label_array
                     + norm(xy_bb_left(1,:)-xy_bb_left(2,:))+norm(xy_bb_right(1,:)-xy_bb_right(2,:));
                 
             end
-            
-%              %% Debugging ==============================================
-%             if debug == true
-%                 figure(100)
-%                 plot3([0, gravity_cam(1)*1000], [0, gravity_cam(2)*1000], [0, gravity_cam(3)*1000], 'm')
-%                 xlabel('X_c')
-%                 ylabel('Y_c')
-%                 zlabel('Z_c')
-%                 xlim([-3000 3000])
-%                 ylim([-3000 3000])
-%                 zlim([0 3000])
-% 
-%                 % plot all lines
-%                 for k = 1:length(lines)
-%                     hold on
-%                     if selection(k)==1
-%                         color = 'r';
-%                     else
-%                         color = 'g';
-%                     end
-%                     
-%                     plot3([points1_cam(k,1),points2_cam(k,1)], ...
-%                         [points1_cam(k,2),points2_cam(k,2)], [points1_cam(k,3), points2_cam(k,3)], color);
-%                     scatter3([points1_cam(k,1),points2_cam(k,1)], ...
-%                         [points1_cam(k,2),points2_cam(k,2)], [points1_cam(k,3), points2_cam(k,3)], 'gx')
-%                 end
-% 
-%                 % best lines
-%                 best_lines = lines(best.first.random2);  %%%%%%%%%%%%%%
-%                 
-%                 % first selected line
-%                 points_x_c_1 = [best_lines(1).point1_cam(1); best_lines(1).point2_cam(1)];    
-%                 points_y_c_1 = [best_lines(1).point1_cam(2); best_lines(1).point2_cam(2)];
-%                 points_z_c_1 = [best_lines(1).point1_cam(3); best_lines(1).point2_cam(3)];
-%                 % second selected line
-%                 points_x_c_2 = [best_lines(2).point1_cam(1); best_lines(2).point2_cam(1)];
-%                 points_y_c_2 = [best_lines(2).point1_cam(2); best_lines(2).point2_cam(2)];
-%                 points_z_c_2 = [best_lines(2).point1_cam(3); best_lines(2).point2_cam(3)];
-% 
-%                 hold on
-%                 plot3(points_x_c_1, points_y_c_1, points_z_c_1, 'b', 'LineWidth', 2)
-%                 hold on
-%                 scatter3(points_x_c_1, points_y_c_1, points_z_c_1, 'bx')
-% 
-%                 hold on
-%                 plot3(points_x_c_2, points_y_c_2, points_z_c_2, 'b', 'LineWidth', 2)
-%                 hold on
-%                 scatter3(points_x_c_2, points_y_c_2, points_z_c_2, 'bx')
-% 
-%             end
-            
-            
+                      
             %% calculate new bounding box
             % convert lines to function of other coordinate 
             % limiting the bounding box
