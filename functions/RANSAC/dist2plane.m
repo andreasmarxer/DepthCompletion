@@ -1,12 +1,15 @@
 function distance = dist2plane(P, param)
 % calculte shortest distance from point to plane
 % input:    P = [x1, y1, z1; x2, y2, z2; x3, y3, z3; ... ; xN, yN, zN]
+%           param is the normal vector of the plane ax+by+d = z
+%           which is is [a; b; d]
 % output:   distance
 
 a = param(1);
 b = param(2);
 c = -1;
 d = param(3);
+
 
 N = size(P,1);
 distance = zeros(N,1);
