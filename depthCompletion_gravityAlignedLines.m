@@ -39,7 +39,6 @@ for label = label_array
     % load predicted bounding boxes
     bb_filename = strcat(path, 'rgb_images_predictions/' ,'asl_window_','rgb_', num2str(label), '.txt');
     [class, confidence, left_x_vec, top_y_vec, width_vec, height_vec] = importBoundingBoxes(bb_filename);
-    %[class, confidence, left_x_vec, top_y_vec, width_vec, height_vec] = importBoundingBoxes_WindowsMatlab2018b(bb_filename);
     
     %% only consider windows with a confidence higher than the threshold
     windows_conf = confidence>confidence_th;
@@ -66,6 +65,7 @@ for label = label_array
             figure(1);
             close;
             figure(1);
+            set(gcf,'renderer','OpenGL');
             %set(gcf, 'Position', [437 136 1986 1193]);
             set(gcf, 'Units', 'pixels');
 

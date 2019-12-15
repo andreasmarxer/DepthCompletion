@@ -5,10 +5,10 @@ function visualize_depth_png(img_png)
 % output:   none, plots figure
 
     img_scaled = 10*img_png;    %scale that uint16 range is better used
-    imshow(img_scaled, 'colormap', jet);
+    imshow(img_scaled, 'colormap', jet(1000));
     originalSize = get(gca, 'Position');
     c = colorbar;
-    c.Label.String = 'Depth in [10‚Åª4m]';
+    c.Label.String = 'Depth in [10‚?ª4m]';
     set(gca, 'Position', originalSize); % set current axis to size before colormap
     
 end
