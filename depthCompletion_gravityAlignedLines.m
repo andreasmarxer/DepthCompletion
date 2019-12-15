@@ -8,7 +8,7 @@ rotate_back = true;     % rotate the processed image back before saving png
 
 ploting = true;         % plot for every label the rgb, depth and completed depth
 debug = false;          % outputs and more plots
-save = true;            %
+save = false;           %
 save_figures = false;   % save the figure with rgb, depth and completed depth
 label = 353;            % label to do depth completion, use 0 for loop with all
 % -------------------------------------------------------------------------
@@ -39,7 +39,8 @@ for label = label_array
     % load predicted bounding boxes
     bb_filename = strcat(path, 'rgb_images_predictions/' ,'asl_window_','rgb_', num2str(label), '.txt');
     [class, confidence, left_x_vec, top_y_vec, width_vec, height_vec] = importBoundingBoxes(bb_filename);
-
+    %[class, confidence, left_x_vec, top_y_vec, width_vec, height_vec] = importBoundingBoxes_WindowsMatlab2018b(bb_filename);
+    
     %% only consider windows with a confidence higher than the threshold
     windows_conf = confidence>confidence_th;
     left_x_vec = left_x_vec(windows_conf);
@@ -65,7 +66,7 @@ for label = label_array
             figure(1);
             close;
             figure(1);
-            set(gcf, 'Position', [437 136 1986 1193]);
+            %set(gcf, 'Position', [437 136 1986 1193]);
             set(gcf, 'Units', 'pixels');
 
             %% RGB image
