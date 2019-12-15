@@ -208,6 +208,7 @@ if rotation == true
     img = imrotate(img, 180);
 end
 
+% median filter the depth image
 if raster_correction == true && type(1) == 'd'
     kernel_half = (kernel-1)/2;
     depth_img_woraster = img;
