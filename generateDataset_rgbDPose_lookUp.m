@@ -1,3 +1,7 @@
+% script to generate dataset containing rgb and depth images
+% as well as looked up pose at times corresponding with an
+% tolerance of 1/1000s between rgb and depth time stamp
+
 clear; close all; clc;
 
 filename = '/media/andreas/SanDiskSSD/Semester_Thesis/ros_recording/original5_maplab_optimized_2019-11-28-13-18-04.bag';
@@ -13,7 +17,7 @@ kernel = 5;         % kernel size for median filter
 print = false;      % print images as figures
 save_img = false;   % save images (depth png, rgb jpeg)
 save_mat = false;   % save image additionaly as array
-debug = false;       % print msgs for debugging
+debug = false;      % print msgs for debugging
 tolerance_depth_rgb = 1/1000; %1ms tol in header time for correspondances
 % =========================================================================
 
@@ -50,16 +54,7 @@ else
 end
 
 num_corr = size(idx_rgb_depth,1);
-    
-%% debugging
 
-if debug == true
-    for i = 1:num_corr
-        diff = msg_time_vec_rgb(idx_rgb_depth(i))-msg_time_vec_depth(idx_depth_rgb(i));
-        test(i) = diff > tolerance_depth_rgb;
-    end
-nnz(test) % if 0 it worked correct
-end
 
 %% save images
 
@@ -97,8 +92,11 @@ end
 
 function msg_time = return_msg_time(topic_bag, frame)
 % returns message content header time per frame
-% input:    topic selected from bag with select(bag, 'Topic', topic)
-% output:   header time in second (added up s and ns from bag header)
+%
+% input:    topic_bag:  topic selected from bag with select(bag, 'Topic', topic)
+%           frame:      number of message to read from topic
+%
+% output:   msg_time:   header time in second (added up s and ns from bag header)
 
 topic_frame_msg_cell = readMessages(topic_bag, frame); % take image message of frames from topic
 topic_frame_msg = topic_frame_msg_cell{1}; % extract from cell
@@ -117,7 +115,11 @@ end
 
 function [idx_long, idx_short] = return_idx(msg_time_vec_1, msg_time_vec_2, tolerance)
 % returns indexes of correspondances long and short image header time vector
-% input:    header time vector in [s] of two images, tolerance in [s]
+%
+% input:    msg_time_vec_1: header time vector in [s] of first image
+%           msg_time_vec_2: header time vector in [s] of second image
+%           tolerance: time in [s] in which interval we consider as correspondante
+%
 % output:   index of time vectors which correspond considering tolerance
 
 % define long and short vector
@@ -177,6 +179,7 @@ end
 
 function plot_save_img(topic_bag, frame, label, type, rotation, print, save_img, save_mat, img_format, raster_correction, kernel)
 % plots and saves img according to specifications defined in input
+%
 % input:    topic_bag:  topic of bag
 %           frame:      message number in topic
 %           label:      correspondance number to numerate images
@@ -188,6 +191,7 @@ function plot_save_img(topic_bag, frame, label, type, rotation, print, save_img,
 %           img_format: 'jpg' for rgb, 'png' for depth
 %           raster_correction:  boolean, if true median filter is applied on depth
 %           kernel:     kernel size for raster correction
+%
 % output:   index of time vectors which correspond considering tolerance
 
 if nargin < 9
@@ -263,10 +267,12 @@ end
 
 
 function log_save_pose_lookedup(label, tf, filename)
-% saves txt file with looked up poses in Open3D rgbd_integration format
-% input:    label matching with images numbering
-%           transformation (tf)
-%           filename to save txt file
+% saves txt file with looked up poses for Open3D rgbd_integration.py
+%
+% input:    label: number matching with images numbering
+%           tf: transformation
+%           filename: name where to save txt file
+%
 % output:   none, creates and saves file in current folder
 
 fid = fopen(filename,'a');
@@ -284,10 +290,11 @@ end
 
 
 function pose = return_pose_tfStamped_msg(tf)
-% transform tf pose format (quaternion) to transformation matrix
-% input:    transformation (tf)
-%           invert: boolean, for inverting the pose world -> cam
-% output:   transformation matrix (4x4)
+% transforms tf pose format (quaternion) to transformation matrix
+%
+% input:    tf:     transformation
+%
+% output:   pose:   transformation matrix (4x4)
 
 % rotation
 q_x = tf.Transform.Rotation.X;
