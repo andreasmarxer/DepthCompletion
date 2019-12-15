@@ -1,4 +1,12 @@
 function med = kernelMedian(k, x, y, depth_img)
+% returns median value in kernel size around pixel x,y
+%
+% input:    k:          size of kernel (needs to be odd!)
+%           x:          x pixel coordinate
+%           y:          y pixel coordinate
+%           depth_img:  loaded png image
+%
+% output:   med:    value of median inside kernel neglecting zeros
 
 if mod(k,2)==0
     error('ERROR: Kernel must be odd size for this application!');
